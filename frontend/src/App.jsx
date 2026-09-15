@@ -26,47 +26,51 @@ function App() {
     });
   };
 
-  const predictRisk = async () => {
-    setLoading(true);
-    setError("");
+ const predictRisk = async () => {
+  setLoading(true);
+  setError("");
 
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/predict-risk`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify(data),
-});
-
-      if (!response.ok) {
-        throw new Error("Prediction request failed");
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/predict-risk`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(inputs),
       }
+    );
 
-      const data = await response.json();
-
-      setResult(data);
-    } catch (err) {
-      console.error(err);
-      setError(
-        "Unable to connect to LANDGUARD AI backend. Make sure FastAPI is running."
-      );
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error("Prediction request failed");
     }
-  };
+
+    const resultData = await response.json();
+
+    setResult(resultData);
+  } catch (err) {
+    console.error(err);
+
+    setError(
+      "Unable to connect to LANDGUARD AI backend. Make sure FastAPI is running."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const riskLevel = result?.risk_level || "Not Analyzed";
   const confidence = result?.confidence || 0;
 
-const riskClass =
-  riskLevel === "High"
-    ? "risk-high"
-    : riskLevel === "Moderate"
-    ? "risk-moderate"
-    : riskLevel === "Low"
-    ? "risk-low"
-    : "risk-none";
+  const riskClass =
+    riskLevel === "High"
+      ? "risk-high"
+      : riskLevel === "Moderate"
+      ? "risk-moderate"
+      : riskLevel === "Low"
+      ? "risk-low"
+      : "risk-none";
 
   return (
     <div className="app">
@@ -402,72 +406,81 @@ const riskClass =
               </button>
 
             </div>
-<div className="map-container">
-  <MapContainer
-    center={[26.2, 92.9]}
-    zoom={6}
-    scrollWheelZoom={true}
-    style={{ height: "450px", width: "100%" }}
-  >
-    <TileLayer
-      attribution='&copy; OpenStreetMap contributors'
-      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    />
 
-    <CircleMarker
-      center={[26.1445, 91.7362]}
-      radius={18}
-      pathOptions={{
-        color: "red",
-        fillColor: "red",
-        fillOpacity: 0.6,
-      }}
-    >
-      <Popup>
-        <strong>HIGH RISK ZONE</strong>
-        <br />
-        Guwahati Region
-        <br />
-        Heavy rainfall detected
-      </Popup>
-    </CircleMarker>
+            <div className="map-container">
 
-    <CircleMarker
-      center={[25.5788, 91.8933]}
-      radius={14}
-      pathOptions={{
-        color: "orange",
-        fillColor: "orange",
-        fillOpacity: 0.6,
-      }}
-    >
-      <Popup>
-        <strong>MODERATE RISK</strong>
-        <br />
-        Shillong Region
-      </Popup>
-    </CircleMarker>
+              <MapContainer
+                center={[26.2, 92.9]}
+                zoom={6}
+                scrollWheelZoom={true}
+                style={{ height: "450px", width: "100%" }}
+              >
 
-    <CircleMarker
-      center={[27.4728, 94.9120]}
-      radius={12}
-      pathOptions={{
-        color: "green",
-        fillColor: "green",
-        fillOpacity: 0.6,
-      }}
-    >
-      <Popup>
-        <strong>LOW RISK</strong>
-        <br />
-        Assam Region
-      </Popup>
-    </CircleMarker>
-  </MapContainer>
-</div>
+                <TileLayer
+                  attribution="&copy; OpenStreetMap contributors"
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+
+                <CircleMarker
+                  center={[26.1445, 91.7362]}
+                  radius={18}
+                  pathOptions={{
+                    color: "red",
+                    fillColor: "red",
+                    fillOpacity: 0.6,
+                  }}
+                >
+                  <Popup>
+                    <strong>HIGH RISK ZONE</strong>
+                    <br />
+                    Guwahati Region
+                    <br />
+                    Heavy rainfall detected
+                  </Popup>
+                </CircleMarker>
 
 
-                    {/* PREDICTION */}
+                <CircleMarker
+                  center={[25.5788, 91.8933]}
+                  radius={14}
+                  pathOptions={{
+                    color: "orange",
+                    fillColor: "orange",
+                    fillOpacity: 0.6,
+                  }}
+                >
+                  <Popup>
+                    <strong>MODERATE RISK</strong>
+                    <br />
+                    Shillong Region
+                  </Popup>
+                </CircleMarker>
+
+
+                <CircleMarker
+                  center={[27.4728, 94.9120]}
+                  radius={12}
+                  pathOptions={{
+                    color: "green",
+                    fillColor: "green",
+                    fillOpacity: 0.6,
+                  }}
+                >
+                  <Popup>
+                    <strong>LOW RISK</strong>
+                    <br />
+                    Assam Region
+                  </Popup>
+                </CircleMarker>
+
+              </MapContainer>
+
+            </div>
+
+          </div>
+
+
+          {/* PREDICTION */}
           <div className="panel prediction-panel">
 
             <div className="panel-header">
@@ -483,6 +496,7 @@ const riskClass =
               </div>
 
             </div>
+
 
             <div className="prediction-result">
 
@@ -500,6 +514,7 @@ const riskClass =
 
             </div>
 
+
             <div className="prediction-item">
 
               <div>
@@ -514,6 +529,7 @@ const riskClass =
               <b>58%</b>
 
             </div>
+
 
             <div className="prediction-item">
 
@@ -530,6 +546,7 @@ const riskClass =
 
             </div>
 
+
             <div className="prediction-item">
 
               <div>
@@ -545,9 +562,7 @@ const riskClass =
 
             </div>
 
-                   </div>
-
-        </div>
+          </div>
 
         </section>
 
@@ -572,48 +587,86 @@ const riskClass =
             </div>
 
 
-      <div className="cascade-flow">
+            <div className="cascade-flow">
 
-  <div className="cascade-node">
-    <span>🌧️</span>
-    <strong>Heavy Rain</strong>
-    <small>
-      {inputs.rainfall_24h} mm / 24h
-    </small>
-  </div>
+              <div className="cascade-node">
 
-  <div className="arrow">→</div>
+                <span>🌧️</span>
 
-  <div className="cascade-node">
-    <span>💧</span>
-    <strong>Soil Saturation</strong>
-    <small>
-      {inputs.soil_moisture}% moisture
-    </small>
-  </div>
+                <strong>Heavy Rain</strong>
 
-  <div className="arrow">→</div>
+                <small>
+                  {inputs.rainfall_24h} mm / 24h
+                </small>
 
-  <div className={`cascade-node ${riskLevel === "High" ? "danger" : ""}`}>
-    <span>⛰️</span>
-    <strong>Landslide</strong>
-    <small>
-      AI Risk: {riskLevel}
-    </small>
-  </div>
+              </div>
 
-  <div className="arrow">→</div>
 
-  <div className={`cascade-node ${riskLevel === "High" ? "danger" : ""}`}>
-    <span>🛣️</span>
-    <strong>Road Blockage</strong>
-    <small>
-      Potential impact
-    </small>
-   </div>
-</div>
+              <div className="arrow">
+                →
+              </div>
+
+
+              <div className="cascade-node">
+
+                <span>💧</span>
+
+                <strong>Soil Saturation</strong>
+
+                <small>
+                  {inputs.soil_moisture}% moisture
+                </small>
+
+              </div>
+
+
+              <div className="arrow">
+                →
+              </div>
+
+
+              <div
+                className={`cascade-node ${
+                  riskLevel === "High" ? "danger" : ""
+                }`}
+              >
+
+                <span>⛰️</span>
+
+                <strong>Landslide</strong>
+
+                <small>
+                  AI Risk: {riskLevel}
+                </small>
+
+              </div>
+
+
+              <div className="arrow">
+                →
+              </div>
+
+
+              <div
+                className={`cascade-node ${
+                  riskLevel === "High" ? "danger" : ""
+                }`}
+              >
+
+                <span>🛣️</span>
+
+                <strong>Road Blockage</strong>
+
+                <small>
+                  Potential impact
+                </small>
+
+              </div>
+
+            </div>
 
           </div>
+
 
           <div className="panel copilot-panel">
 
