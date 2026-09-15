@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pathlib import Path
 import pandas as pd
 import joblib
 
@@ -21,8 +22,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Load trained ML model
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 model = joblib.load(
-    "ml/models/landslide_risk_model.pkl"
+    BASE_DIR / "ml" / "models" / "landslide_risk_model.pkl"
 )
 
 
