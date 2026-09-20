@@ -1,5 +1,16 @@
 import { useState } from "react";
 import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+
+import {
   MapContainer,
   TileLayer,
   CircleMarker,
@@ -98,22 +109,45 @@ function App() {
   // 7-DAY FORECAST
   // =========================================================
 
-  const getSevenDayForecast = async () => {
+  const getSevenDayForecast = async (event) => {
+    // Prevent accidental form submission/page reload
+    if (event) {
+      event.preventDefault();
+    }
+
     setForecastLoading(true);
     setError("");
 
     try {
-      // Temporary demo rainfall forecast.
-      // Later we will replace this with real weather API data.
-      const rainfallForecast = [
-        40,
-        55,
-        80,
-        110,
-        140,
-        155,
-        100,
-      ];
+      // -------------------------------------------------------
+      // STEP 1: GET LIVE WEATHER FORECAST
+      // -------------------------------------------------------
+
+      const weatherResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/weather-forecast`
+      );
+
+      if (!weatherResponse.ok) {
+        throw new Error("Unable to fetch weather forecast");
+      }
+
+      const weatherData = await weatherResponse.json();
+
+      // -------------------------------------------------------
+      // STEP 2: EXTRACT RAINFALL + DATES
+      // -------------------------------------------------------
+
+      const rainfallForecast = weatherData.forecast.map(
+        (day) => day.rainfall
+      );
+
+      const forecastDates = weatherData.forecast.map(
+        (day) => day.date
+      );
+
+      // -------------------------------------------------------
+      // STEP 3: SEND WEATHER DATA TO AI FORECAST MODEL
+      // -------------------------------------------------------
 
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/forecast-7days`,
@@ -124,6 +158,7 @@ function App() {
           },
           body: JSON.stringify({
             rainfall_forecast: rainfallForecast,
+            forecast_dates: forecastDates,
             soil_moisture: inputs.soil_moisture,
             slope_angle: inputs.slope_angle,
             elevation: inputs.elevation,
@@ -140,7 +175,7 @@ function App() {
 
       setForecast(data.forecast);
     } catch (err) {
-      console.error(err);
+      console.error("7-Day Forecast Error:", err);
 
       setError(err.message);
     } finally {
@@ -273,11 +308,17 @@ function App() {
 
           <div className="header-actions">
 
-            <button className="location-btn">
+            <button
+              type="button"
+              className="location-btn"
+            >
               📍 North Eastern Region
             </button>
 
-            <button className="profile-btn">
+            <button
+              type="button"
+              className="profile-btn"
+            >
               TS
             </button>
 
@@ -353,6 +394,7 @@ function App() {
             </div>
 
             <button
+              type="button"
               className="predict-btn"
               onClick={predictRisk}
               disabled={loading}
@@ -367,8 +409,6 @@ function App() {
 
 
           <div className="input-grid">
-
-            {/* 24 HOUR RAINFALL */}
 
             <div className="input-card">
 
@@ -386,8 +426,6 @@ function App() {
             </div>
 
 
-            {/* 7 DAY RAINFALL */}
-
             <div className="input-card">
 
               <label>
@@ -403,8 +441,6 @@ function App() {
 
             </div>
 
-
-            {/* SOIL MOISTURE */}
 
             <div className="input-card">
 
@@ -422,8 +458,6 @@ function App() {
             </div>
 
 
-            {/* SLOPE */}
-
             <div className="input-card">
 
               <label>
@@ -440,8 +474,6 @@ function App() {
             </div>
 
 
-            {/* ELEVATION */}
-
             <div className="input-card">
 
               <label>
@@ -457,8 +489,6 @@ function App() {
 
             </div>
 
-
-            {/* NDVI */}
 
             <div className="input-card">
 
@@ -513,9 +543,15 @@ function App() {
                 seven days
               </p>
 
+              <p className="weather-source">
+                🟢 LIVE WEATHER DATA • Open-Meteo • Guwahati
+              </p>
+
             </div>
 
+
             <button
+              type="button"
               className="forecast-button"
               onClick={getSevenDayForecast}
               disabled={forecastLoading}
@@ -531,7 +567,84 @@ function App() {
           </div>
 
 
-          {/* FORECAST RESULTS */}
+          {/* =================================================
+              RAINFALL + RISK TREND
+          ================================================== */}
+
+          {forecast.length > 0 && (
+
+            <div className="forecast-chart">
+
+              <div className="chart-title">
+
+                <span className="section-label">
+                  RAINFALL & RISK TREND
+                </span>
+
+                <p>
+                  7-day weather-driven landslide risk outlook
+                </p>
+
+              </div>
+
+
+              <ResponsiveContainer
+                width="100%"
+                height={320}
+              >
+
+                <LineChart
+                  data={forecast}
+                  margin={{
+                    top: 20,
+                    right: 20,
+                    left: 0,
+                    bottom: 10,
+                  }}
+                >
+
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                  />
+
+                  <XAxis
+                    dataKey="date"
+                  />
+
+                  <YAxis />
+
+                  <Tooltip />
+
+                  <Legend />
+
+                  <Line
+                    type="monotone"
+                    dataKey="rainfall"
+                    name="Rainfall (mm)"
+                    strokeWidth={3}
+                    dot={{ r: 4 }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="risk_probability"
+                    name="Risk Probability (%)"
+                    strokeWidth={3}
+                    dot={{ r: 4 }}
+                  />
+
+                </LineChart>
+
+              </ResponsiveContainer>
+
+            </div>
+
+          )}
+
+
+          {/* =================================================
+              FORECAST RESULTS
+          ================================================== */}
 
           {forecast.length > 0 && (
 
@@ -548,27 +661,34 @@ function App() {
                     DAY {day.day}
                   </span>
 
+                  <span className="forecast-date">
+                    {day.date}
+                  </span>
+
                   <h3>
                     {day.risk_level}
                   </h3>
 
-                  <p>
-                    🌧️ Rainfall:{" "}
+                  <p className="forecast-rainfall">
+                    🌧️ Rainfall:
                     <strong>
+                      {" "}
                       {day.rainfall} mm
                     </strong>
                   </p>
 
                   <p>
-                    💧 Soil Moisture:{" "}
+                    💧 Soil Moisture:
                     <strong>
+                      {" "}
                       {day.soil_moisture}%
                     </strong>
                   </p>
 
                   <p>
-                    📊 Risk Probability:{" "}
+                    📊 Risk Probability:
                     <strong>
+                      {" "}
                       {day.risk_probability}%
                     </strong>
                   </p>
@@ -582,7 +702,9 @@ function App() {
           )}
 
 
-          {/* BEFORE FORECAST IS GENERATED */}
+          {/* =================================================
+              BEFORE FORECAST IS GENERATED
+          ================================================== */}
 
           {forecast.length === 0 && !forecastLoading && (
 
@@ -606,6 +728,98 @@ function App() {
 
           )}
 
+
+          {/* =================================================
+              RISK TREND CHART
+          ================================================== */}
+
+          {forecast.length > 0 && (
+
+            <div className="forecast-chart">
+
+              <div className="chart-header">
+
+                <div>
+
+                  <span className="section-label">
+                    RISK TREND
+                  </span>
+
+                  <h3>
+                    7-Day Risk Probability
+                  </h3>
+
+                  <p>
+                    AI-predicted landslide risk probability
+                    across the forecast period
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              <ResponsiveContainer
+                width="100%"
+                height={300}
+              >
+
+                <LineChart
+                  data={forecast}
+                  margin={{
+                    top: 10,
+                    right: 20,
+                    left: 10,
+                    bottom: 10,
+                  }}
+                >
+
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                  />
+
+                  <XAxis
+                    dataKey="day"
+                    tickFormatter={(day) =>
+                      `Day ${day}`
+                    }
+                  />
+
+                  <YAxis
+                    domain={[0, 100]}
+                    label={{
+                      value: "Risk Probability (%)",
+                      angle: -90,
+                      position: "insideLeft",
+                    }}
+                  />
+
+                  <Tooltip
+                    formatter={(value) => [
+                      `${value}%`,
+                      "Risk Probability",
+                    ]}
+                    labelFormatter={(day) =>
+                      `Day ${day}`
+                    }
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="risk_probability"
+                    strokeWidth={3}
+                    dot={{ r: 5 }}
+                    activeDot={{ r: 7 }}
+                  />
+
+                </LineChart>
+
+              </ResponsiveContainer>
+
+            </div>
+
+          )}
+
         </section>
 
 
@@ -614,8 +828,6 @@ function App() {
         ==================================================== */}
 
         <section className="stats-grid">
-
-          {/* RAINFALL */}
 
           <div className="stat-card">
 
@@ -642,8 +854,6 @@ function App() {
           </div>
 
 
-          {/* SOIL */}
-
           <div className="stat-card">
 
             <div className="stat-top">
@@ -669,8 +879,6 @@ function App() {
           </div>
 
 
-          {/* SLOPE */}
-
           <div className="stat-card">
 
             <div className="stat-top">
@@ -695,8 +903,6 @@ function App() {
 
           </div>
 
-
-          {/* AI RESULT */}
 
           <div className="stat-card">
 
@@ -751,11 +957,104 @@ function App() {
 
               </div>
 
-              <button className="view-btn">
+              <button
+                type="button"
+                className="view-btn"
+              >
                 View Full Map →
               </button>
 
             </div>
+
+
+            {/* =================================================
+                IMPROVED 7-DAY OUTLOOK SUMMARY
+            ================================================== */}
+
+            {forecast.length > 0 && (() => {
+
+              const peakDay = forecast.reduce(
+                (max, day) =>
+                  day.risk_probability >
+                  max.risk_probability
+                    ? day
+                    : max
+              );
+
+              return (
+
+                <div className="forecast-summary">
+<div className="summary-card">
+  <span className="summary-label">FORECAST STATUS</span>
+  <strong className="summary-status">
+    {forecast.length === 7 ? "7 DAYS READY" : "NOT READY"}
+  </strong>
+  <small>Forecast data available for risk monitoring</small>
+</div>
+
+                  {/* PEAK RISK */}
+
+                  <div className="summary-card">
+
+                    <span className="summary-label">
+                      PEAK RISK
+                    </span>
+
+                    <strong
+                      className={`summary-risk risk-${peakDay.risk_level.toLowerCase()}`}
+                    >
+                      {peakDay.risk_level}
+                    </strong>
+
+                    <small>
+                      Highest predicted risk level
+                    </small>
+
+                  </div>
+
+
+                  {/* PEAK PROBABILITY */}
+
+                  <div className="summary-card">
+
+                    <span className="summary-label">
+                      PEAK PROBABILITY
+                    </span>
+
+                    <strong>
+                      {peakDay.risk_probability}%
+                    </strong>
+
+                    <small>
+                      Maximum predicted probability
+                    </small>
+
+                  </div>
+
+
+                  {/* PEAK DAY */}
+
+                  <div className="summary-card">
+
+                    <span className="summary-label">
+                      PEAK DAY
+                    </span>
+
+                    <strong>
+                      Day {peakDay.day}
+                    </strong>
+
+                    <small>
+                      Highest-risk forecast day
+                    </small>
+
+                  </div>
+
+                </div>
+
+              );
+
+            })()}
 
 
             <div className="map-container">
@@ -776,16 +1075,31 @@ function App() {
                 />
 
 
-                {/* GUWAHATI */}
+                {/* GUWAHATI - CURRENT AI RISK */}
 
                 <CircleMarker
                   center={[26.1445, 91.7362]}
-                  radius={18}
+                  radius={20}
                   pathOptions={{
-                    color: "red",
-                    fillColor: "red",
-                    fillOpacity: 0.6,
-                  }}
+  color:
+    riskLevel === "High"
+      ? "#dc2626"
+      : riskLevel === "Moderate"
+      ? "#f59e0b"
+      : riskLevel === "Low"
+      ? "#16a34a"
+      : "#64748b",
+  fillColor:
+    riskLevel === "High"
+      ? "#dc2626"
+      : riskLevel === "Moderate"
+      ? "#f59e0b"
+      : riskLevel === "Low"
+      ? "#16a34a"
+      : "#64748b",
+  fillOpacity: 0.65,
+  weight: 3,
+}}
                 >
 
                   <Popup>
@@ -1058,8 +1372,23 @@ function App() {
                 </strong>
 
                 <small>
-                  {inputs.rainfall_24h}
-                  {" "}mm / 24h
+
+                  {inputs.rainfall_24h} mm / 24h
+
+                  <br />
+
+                  Status:{" "}
+
+                  <strong>
+
+                    {inputs.rainfall_24h >= 100
+                      ? "HIGH"
+                      : inputs.rainfall_24h >= 50
+                      ? "MODERATE"
+                      : "LOW"}
+
+                  </strong>
+
                 </small>
 
               </div>
@@ -1070,9 +1399,17 @@ function App() {
               </div>
 
 
-              {/* SOIL */}
+              {/* SOIL SATURATION */}
 
-              <div className="cascade-node">
+              <div
+                className={`cascade-node ${
+                  inputs.soil_moisture >= 80
+                    ? "danger"
+                    : inputs.soil_moisture >= 60
+                    ? "warning"
+                    : ""
+                }`}
+              >
 
                 <span>
                   💧
@@ -1083,8 +1420,23 @@ function App() {
                 </strong>
 
                 <small>
-                  {inputs.soil_moisture}%
-                  {" "}moisture
+
+                  {inputs.soil_moisture}% moisture
+
+                  <br />
+
+                  Status:{" "}
+
+                  <strong>
+
+                    {inputs.soil_moisture >= 80
+                      ? "HIGH"
+                      : inputs.soil_moisture >= 60
+                      ? "MODERATE"
+                      : "LOW"}
+
+                  </strong>
+
                 </small>
 
               </div>
@@ -1101,6 +1453,8 @@ function App() {
                 className={`cascade-node ${
                   riskLevel === "High"
                     ? "danger"
+                    : riskLevel === "Moderate"
+                    ? "warning"
                     : ""
                 }`}
               >
@@ -1114,7 +1468,13 @@ function App() {
                 </strong>
 
                 <small>
-                  AI Risk: {riskLevel}
+
+                  AI Risk:{" "}
+
+                  <strong>
+                    {riskLevel}
+                  </strong>
+
                 </small>
 
               </div>
@@ -1131,6 +1491,8 @@ function App() {
                 className={`cascade-node ${
                   riskLevel === "High"
                     ? "danger"
+                    : riskLevel === "Moderate"
+                    ? "warning"
                     : ""
                 }`}
               >
@@ -1144,7 +1506,63 @@ function App() {
                 </strong>
 
                 <small>
-                  Potential impact
+
+                  Status:{" "}
+
+                  <strong>
+
+                    {riskLevel === "High"
+                      ? "HIGH"
+                      : riskLevel === "Moderate"
+                      ? "MODERATE"
+                      : "LOW"}
+
+                  </strong>
+
+                </small>
+
+              </div>
+
+
+              <div className="arrow">
+                →
+              </div>
+
+
+              {/* FLOOD / INFRASTRUCTURE */}
+
+              <div
+                className={`cascade-node ${
+                  riskLevel === "High"
+                    ? "danger"
+                    : riskLevel === "Moderate"
+                    ? "warning"
+                    : ""
+                }`}
+              >
+
+                <span>
+                  🌊
+                </span>
+
+                <strong>
+                  Flood / Infrastructure
+                </strong>
+
+                <small>
+
+                  Status:{" "}
+
+                  <strong>
+
+                    {riskLevel === "High"
+                      ? "HIGH"
+                      : riskLevel === "Moderate"
+                      ? "MODERATE"
+                      : "LOW"}
+
+                  </strong>
+
                 </small>
 
               </div>
@@ -1181,7 +1599,10 @@ function App() {
                 guidelines.
               </p>
 
-              <button className="copilot-btn">
+              <button
+                type="button"
+                className="copilot-btn"
+              >
                 Open AI Copilot →
               </button>
 

@@ -707,3 +707,607 @@ footer {
 .risk-banner.risk-none {
   border-left: 6px solid #64748b;
 }
+
+/* =========================================================
+   7-DAY FORECAST
+   ========================================================= */
+
+.forecast-panel {
+  margin-top: 24px;
+}
+
+.forecast-button {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.forecast-button:hover {
+  transform: translateY(-2px);
+}
+
+.forecast-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.forecast-card {
+  padding: 18px 14px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  min-height: 175px;
+  transition: 0.2s ease;
+}
+
+.forecast-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.forecast-day {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+  opacity: 0.65;
+}
+
+.forecast-card h3 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.forecast-card p {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.forecast-card strong {
+  font-weight: 700;
+}
+
+/* Risk states */
+
+.forecast-card.risk-high {
+  border-left: 5px solid #dc2626;
+  background: #fff5f5;
+}
+
+.forecast-card.risk-moderate {
+  border-left: 5px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.forecast-card.risk-low {
+  border-left: 5px solid #16a34a;
+  background: #f0fdf4;
+}
+
+/* Empty state */
+
+.forecast-empty {
+  margin-top: 24px;
+  padding: 40px 20px;
+  text-align: center;
+  border: 1px dashed #d1d5db;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.forecast-empty-icon {
+  font-size: 38px;
+  margin-bottom: 12px;
+}
+
+.forecast-empty h3 {
+  margin: 0 0 8px;
+}
+
+.forecast-empty p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* =========================================================
+   7-DAY RISK TREND CHART
+   ========================================================= */
+
+.forecast-chart {
+  margin-top: 30px;
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.chart-header {
+  margin-bottom: 18px;
+}
+
+.chart-header h3 {
+  margin: 6px 0;
+  font-size: 20px;
+}
+
+.chart-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* =========================================================
+   RESPONSIVE DESIGN
+   ========================================================= */
+
+@media (max-width: 1200px) {
+  .forecast-grid {
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .forecast-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .forecast-panel .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .forecast-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 500px) {
+  .forecast-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .forecast-chart {
+    padding: 14px;
+  }
+}
+
+/* =========================================================
+   MAP 7-DAY OUTLOOK
+   ========================================================= */
+
+.map-forecast-summary {
+  margin: 0 0 18px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.map-summary-title h3 {
+  margin: 5px 0 0;
+  font-size: 18px;
+}
+
+.map-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.map-summary-item {
+  padding: 14px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+.map-summary-item span {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.map-summary-item strong {
+  font-size: 18px;
+}
+
+.forecast-risk-text.risk-high {
+  color: #dc2626;
+}
+
+.forecast-risk-text.risk-moderate {
+  color: #d97706;
+}
+
+.forecast-risk-text.risk-low {
+  color: #16a34a;
+}
+
+@media (max-width: 700px) {
+  .map-summary-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* =========================================
+   DYNAMIC CASCADE ANALYSIS
+   ========================================= */
+
+.cascade-flow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 10px 2px 15px;
+}
+
+.cascade-node {
+  min-width: 145px;
+  padding: 16px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  text-align: center;
+  transition: all 0.25s ease;
+}
+
+.cascade-node > span {
+  display: block;
+  font-size: 27px;
+  margin-bottom: 8px;
+}
+
+.cascade-node strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.cascade-node small {
+  display: block;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.cascade-node.warning {
+  border: 2px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.cascade-node.danger {
+  border: 2px solid #dc2626;
+  background: #fff5f5;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.12);
+}
+
+.arrow {
+  flex: 0 0 auto;
+  font-size: 20px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.cascade-forecast-indicator {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.cascade-forecast-indicator strong {
+  font-weight: 800;
+}
+
+.weather-source {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #16a34a;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+/* =========================================================
+   FORECAST RAINFALL
+   ========================================================= */
+
+.forecast-rainfall {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* =========================================================
+   FORECAST DATE
+   ========================================================= */
+
+.forecast-date {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* =========================================
+   7-DAY FORECAST - PROFESSIONAL UI
+   ========================================= */
+
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.forecast-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 10px;
+  min-height: 165px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  transition: all 0.2s ease;
+}
+
+.forecast-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10);
+}
+
+.forecast-card h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.forecast-card .forecast-day {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.forecast-card .forecast-risk {
+  margin: 8px 0;
+  padding: 5px 8px;
+  border-radius: 7px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.forecast-card .forecast-risk.moderate {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.forecast-card .forecast-risk.high {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.forecast-card .forecast-risk.low {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.forecast-card .forecast-risk.critical {
+  background: #7f1d1d;
+  color: #ffffff;
+}
+
+.forecast-card .forecast-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 10px;
+}
+
+.forecast-card .forecast-metric:last-child {
+  border-bottom: none;
+}
+
+.forecast-card .metric-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.forecast-card .metric-value {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.forecast-date {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.forecast-rainfall {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.forecast-rainfall strong {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* Responsive layout */
+@media (max-width: 1100px) {
+  .forecast-grid {
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .forecast-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 450px) {
+  .forecast-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================
+   FORECAST SUMMARY
+   ========================================= */
+
+.forecast-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.summary-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 12px;
+  text-align: center;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.04);
+}
+
+.summary-label {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin-bottom: 7px;
+}
+
+.summary-card strong {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.summary-card small {
+  display: block;
+  margin-top: 5px;
+  font-size: 9px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .forecast-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================
+   LANDSLIDE RISK LEVEL STYLING
+   ========================================= */
+
+.forecast-card.risk-low {
+  border-top: 4px solid #16a34a;
+}
+
+.forecast-card.risk-moderate {
+  border-top: 4px solid #f59e0b;
+}
+
+.forecast-card.risk-high {
+  border-top: 4px solid #dc2626;
+}
+
+.forecast-card.risk-critical {
+  border-top: 4px solid #7f1d1d;
+}
+
+.forecast-card h3 {
+  margin: 8px 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.forecast-card.risk-low h3 {
+  color: #15803d;
+}
+
+.forecast-card.risk-moderate h3 {
+  color: #c2410c;
+}
+
+.forecast-card.risk-high h3 {
+  color: #dc2626;
+}
+
+.forecast-card.risk-critical h3 {
+  color: #7f1d1d;
+}
+
+/* Risk badge in the Peak Risk summary */
+
+.summary-risk {
+  border-radius: 7px;
+  padding: 4px 9px;
+  display: inline-block !important;
+  font-size: 18px !important;
+}
+
+.summary-risk.risk-low {
+  color: #15803d !important;
+  background: #f0fdf4;
+}
+
+.summary-risk.risk-moderate {
+  color: #c2410c !important;
+  background: #fff7ed;
+}
+
+.summary-risk.risk-high {
+  color: #dc2626 !important;
+  background: #fef2f2;
+}
+
+.summary-risk.risk-critical {
+  color: #7f1d1d !important;
+  background: #fef2f2;
+}
+
+.summary-status {
+  color: #2563eb !important;
+  background: #eff6ff;
+  border-radius: 7px;
+  padding: 4px 9px;
+  display: inline-block !important;
+  font-size: 16px !important;
+}
