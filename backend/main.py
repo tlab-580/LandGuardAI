@@ -42,7 +42,12 @@ class RiskInput(BaseModel):
     slope_angle: float
     elevation: float
     ndvi: float
-
+class ForecastInput(BaseModel):
+    rainfall_forecast: list[float]
+    soil_moisture: float
+    slope_angle: float
+    elevation: float
+    ndvi: float
 
 @app.get("/")
 def home():
@@ -87,4 +92,68 @@ def predict_risk(data: RiskInput):
         "risk_level": prediction,
         "confidence": round(float(confidence) * 100, 2),
         "inputs": data.model_dump()
+    }
+@app.post("/forecast-7days")
+def forecast_7days(data: ForecastInput):
+
+    forecast_results = []
+
+    current_soil_moisture = data.soil_moisture
+    cumulative_rainfall = 0
+
+    for day, rainfall in enumerate(data.rainfall_forecast, start=1):
+
+        # Update cumulative rainfall
+        cumulative_rainfall += rainfall
+
+        # Estimate future soil moisture
+        current_soil_moisture = (
+            current_soil_moisture
+            + (rainfall * 0.08)
+            - 2
+        )
+
+        # Keep soil moisture between 0 and 100
+        current_soil_moisture = max(
+            0,
+            min(100, current_soil_moisture)
+        )
+
+        # Prepare model input
+        input_data = pd.DataFrame([{
+            "rainfall_24h": rainfall,
+            "rainfall_7d": cumulative_rainfall,
+            "soil_moisture": current_soil_moisture,
+            "slope_angle": data.slope_angle,
+            "elevation": data.elevation,
+            "ndvi": data.ndvi
+        }])
+
+        # Predict risk
+        prediction = model.predict(input_data)[0]
+
+        probabilities = model.predict_proba(input_data)[0]
+        classes = model.classes_
+
+        confidence = probabilities[
+            list(classes).index(prediction)
+        ]
+
+        forecast_results.append({
+            "day": day,
+            "rainfall": round(rainfall, 2),
+            "soil_moisture": round(
+                current_soil_moisture,
+                2
+            ),
+            "risk_level": prediction,
+            "risk_probability": round(
+                float(confidence) * 100,
+                2
+            )
+        })
+
+    return {
+        "forecast_days": 7,
+        "forecast": forecast_results
     }

@@ -1,9 +1,19 @@
 import { useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Popup,
+} from "react-leaflet";
+
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
 function App() {
+  // =========================================================
+  // ENVIRONMENT INPUTS
+  // =========================================================
+
   const [inputs, setInputs] = useState({
     rainfall_24h: 120,
     rainfall_7d: 450,
@@ -13,9 +23,29 @@ function App() {
     ndvi: 0.35,
   });
 
+  // =========================================================
+  // CURRENT 24-HOUR PREDICTION
+  // =========================================================
+
   const [result, setResult] = useState(null);
+
+  // =========================================================
+  // 7-DAY FORECAST
+  // =========================================================
+
+  const [forecast, setForecast] = useState([]);
+  const [forecastLoading, setForecastLoading] = useState(false);
+
+  // =========================================================
+  // GENERAL STATE
+  // =========================================================
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // =========================================================
+  // HANDLE INPUT CHANGES
+  // =========================================================
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -26,39 +56,101 @@ function App() {
     });
   };
 
- const predictRisk = async () => {
-  setLoading(true);
-  setError("");
+  // =========================================================
+  // CURRENT AI RISK PREDICTION
+  // =========================================================
 
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/predict-risk`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(inputs),
+  const predictRisk = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/predict-risk`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(inputs),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Prediction request failed");
       }
-    );
 
-    if (!response.ok) {
-      throw new Error("Prediction request failed");
+      const resultData = await response.json();
+
+      setResult(resultData);
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        "Unable to connect to LANDGUARD AI backend. Make sure FastAPI is running."
+      );
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const resultData = await response.json();
+  // =========================================================
+  // 7-DAY FORECAST
+  // =========================================================
 
-    setResult(resultData);
-  } catch (err) {
-    console.error(err);
+  const getSevenDayForecast = async () => {
+    setForecastLoading(true);
+    setError("");
 
-    setError(
-      "Unable to connect to LANDGUARD AI backend. Make sure FastAPI is running."
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      // Temporary demo rainfall forecast.
+      // Later we will replace this with real weather API data.
+      const rainfallForecast = [
+        40,
+        55,
+        80,
+        110,
+        140,
+        155,
+        100,
+      ];
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/forecast-7days`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            rainfall_forecast: rainfallForecast,
+            soil_moisture: inputs.soil_moisture,
+            slope_angle: inputs.slope_angle,
+            elevation: inputs.elevation,
+            ndvi: inputs.ndvi,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate 7-day forecast");
+      }
+
+      const data = await response.json();
+
+      setForecast(data.forecast);
+    } catch (err) {
+      console.error(err);
+
+      setError(err.message);
+    } finally {
+      setForecastLoading(false);
+    }
+  };
+
+  // =========================================================
+  // CURRENT RISK
+  // =========================================================
 
   const riskLevel = result?.risk_level || "Not Analyzed";
   const confidence = result?.confidence || 0;
@@ -72,58 +164,111 @@ function App() {
       ? "risk-low"
       : "risk-none";
 
+  // =========================================================
+  // UI
+  // =========================================================
+
   return (
     <div className="app">
 
-      {/* SIDEBAR */}
+      {/* =====================================================
+          SIDEBAR
+      ====================================================== */}
+
       <aside className="sidebar">
 
         <div className="logo">
-          <div className="logo-icon">🏔️</div>
+
+          <div className="logo-icon">
+            🏔️
+          </div>
 
           <div>
             <h2>LANDGUARD</h2>
-            <span>AI DISASTER INTELLIGENCE</span>
+
+            <span>
+              AI DISASTER INTELLIGENCE
+            </span>
           </div>
+
         </div>
 
         <nav>
-          <a className="active">📊 Dashboard</a>
-          <a>🗺️ Risk Map</a>
-          <a>📈 Predictions</a>
-          <a>⚠️ Alerts</a>
-          <a>📷 Citizen Reports</a>
-          <a>🤖 AI Copilot</a>
+
+          <a className="active">
+            📊 Dashboard
+          </a>
+
+          <a>
+            🗺️ Risk Map
+          </a>
+
+          <a>
+            📈 Predictions
+          </a>
+
+          <a>
+            ⚠️ Alerts
+          </a>
+
+          <a>
+            📷 Citizen Reports
+          </a>
+
+          <a>
+            🤖 AI Copilot
+          </a>
+
         </nav>
 
         <div className="system-status">
+
           <span className="status-dot"></span>
 
           <div>
-            <strong>System Online</strong>
-            <small>AI services operational</small>
+
+            <strong>
+              System Online
+            </strong>
+
+            <small>
+              AI services operational
+            </small>
+
           </div>
+
         </div>
 
       </aside>
 
 
-      {/* MAIN */}
+      {/* =====================================================
+          MAIN CONTENT
+      ====================================================== */}
+
       <main className="main-content">
 
-        {/* HEADER */}
+        {/* ===================================================
+            HEADER
+        ==================================================== */}
+
         <header className="topbar">
 
           <div>
+
             <p className="eyebrow">
               DISASTER MANAGEMENT PLATFORM
             </p>
 
-            <h1>LANDGUARD AI</h1>
+            <h1>
+              LANDGUARD AI
+            </h1>
 
             <p className="subtitle">
-              Explainable landslide & cascading disaster early-warning system
+              Explainable landslide & cascading disaster
+              early-warning system
             </p>
+
           </div>
 
           <div className="header-actions">
@@ -141,8 +286,13 @@ function App() {
         </header>
 
 
-        {/* RISK BANNER */}
-        <section className={`risk-banner ${riskClass}`}>
+        {/* ===================================================
+            CURRENT RISK BANNER
+        ==================================================== */}
+
+        <section
+          className={`risk-banner ${riskClass}`}
+        >
 
           <div>
 
@@ -182,12 +332,16 @@ function App() {
         </section>
 
 
-        {/* ENVIRONMENT INPUTS */}
+        {/* ===================================================
+            ENVIRONMENTAL INPUTS
+        ==================================================== */}
+
         <section className="panel input-panel">
 
           <div className="panel-header">
 
             <div>
+
               <span className="section-label">
                 ENVIRONMENTAL INPUTS
               </span>
@@ -195,6 +349,7 @@ function App() {
               <h2>
                 AI Risk Analysis
               </h2>
+
             </div>
 
             <button
@@ -202,7 +357,10 @@ function App() {
               onClick={predictRisk}
               disabled={loading}
             >
-              {loading ? "Analyzing..." : "Run AI Prediction →"}
+              {loading
+                ? "Analyzing..."
+                : "Run AI Prediction →"
+              }
             </button>
 
           </div>
@@ -210,9 +368,13 @@ function App() {
 
           <div className="input-grid">
 
+            {/* 24 HOUR RAINFALL */}
+
             <div className="input-card">
 
-              <label>Rainfall — 24 Hours (mm)</label>
+              <label>
+                Rainfall — 24 Hours (mm)
+              </label>
 
               <input
                 type="number"
@@ -224,9 +386,13 @@ function App() {
             </div>
 
 
+            {/* 7 DAY RAINFALL */}
+
             <div className="input-card">
 
-              <label>Rainfall — 7 Days (mm)</label>
+              <label>
+                Rainfall — 7 Days (mm)
+              </label>
 
               <input
                 type="number"
@@ -238,9 +404,13 @@ function App() {
             </div>
 
 
+            {/* SOIL MOISTURE */}
+
             <div className="input-card">
 
-              <label>Soil Moisture (%)</label>
+              <label>
+                Soil Moisture (%)
+              </label>
 
               <input
                 type="number"
@@ -252,9 +422,13 @@ function App() {
             </div>
 
 
+            {/* SLOPE */}
+
             <div className="input-card">
 
-              <label>Slope Angle (°)</label>
+              <label>
+                Slope Angle (°)
+              </label>
 
               <input
                 type="number"
@@ -266,9 +440,13 @@ function App() {
             </div>
 
 
+            {/* ELEVATION */}
+
             <div className="input-card">
 
-              <label>Elevation (m)</label>
+              <label>
+                Elevation (m)
+              </label>
 
               <input
                 type="number"
@@ -280,9 +458,13 @@ function App() {
             </div>
 
 
+            {/* NDVI */}
+
             <div className="input-card">
 
-              <label>Vegetation Index — NDVI</label>
+              <label>
+                Vegetation Index — NDVI
+              </label>
 
               <input
                 type="number"
@@ -298,22 +480,155 @@ function App() {
 
 
           {error && (
+
             <div className="error-message">
               ⚠️ {error}
             </div>
+
           )}
 
         </section>
 
 
-        {/* RESULT */}
+        {/* ===================================================
+            7-DAY FORECAST
+        ==================================================== */}
+
+        <section className="panel forecast-panel">
+
+          <div className="panel-header">
+
+            <div>
+
+              <span className="section-label">
+                7-DAY AI FORECAST
+              </span>
+
+              <h2>
+                Landslide Risk Forecast
+              </h2>
+
+              <p>
+                Predictive risk assessment for the next
+                seven days
+              </p>
+
+            </div>
+
+            <button
+              className="forecast-button"
+              onClick={getSevenDayForecast}
+              disabled={forecastLoading}
+            >
+
+              {forecastLoading
+                ? "Generating..."
+                : "Generate 7-Day Forecast →"
+              }
+
+            </button>
+
+          </div>
+
+
+          {/* FORECAST RESULTS */}
+
+          {forecast.length > 0 && (
+
+            <div className="forecast-grid">
+
+              {forecast.map((day) => (
+
+                <div
+                  className={`forecast-card risk-${day.risk_level.toLowerCase()}`}
+                  key={day.day}
+                >
+
+                  <span className="forecast-day">
+                    DAY {day.day}
+                  </span>
+
+                  <h3>
+                    {day.risk_level}
+                  </h3>
+
+                  <p>
+                    🌧️ Rainfall:{" "}
+                    <strong>
+                      {day.rainfall} mm
+                    </strong>
+                  </p>
+
+                  <p>
+                    💧 Soil Moisture:{" "}
+                    <strong>
+                      {day.soil_moisture}%
+                    </strong>
+                  </p>
+
+                  <p>
+                    📊 Risk Probability:{" "}
+                    <strong>
+                      {day.risk_probability}%
+                    </strong>
+                  </p>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          )}
+
+
+          {/* BEFORE FORECAST IS GENERATED */}
+
+          {forecast.length === 0 && !forecastLoading && (
+
+            <div className="forecast-empty">
+
+              <div className="forecast-empty-icon">
+                🔮
+              </div>
+
+              <h3>
+                7-Day Forecast Ready
+              </h3>
+
+              <p>
+                Click "Generate 7-Day Forecast" to
+                analyze landslide risk for the next
+                seven days.
+              </p>
+
+            </div>
+
+          )}
+
+        </section>
+
+
+        {/* ===================================================
+            STATISTICS
+        ==================================================== */}
+
         <section className="stats-grid">
+
+          {/* RAINFALL */}
 
           <div className="stat-card">
 
             <div className="stat-top">
-              <span>🌧️</span>
-              <small>RAINFALL</small>
+
+              <span>
+                🌧️
+              </span>
+
+              <small>
+                RAINFALL
+              </small>
+
             </div>
 
             <h3>
@@ -327,11 +642,20 @@ function App() {
           </div>
 
 
+          {/* SOIL */}
+
           <div className="stat-card">
 
             <div className="stat-top">
-              <span>💧</span>
-              <small>SOIL MOISTURE</small>
+
+              <span>
+                💧
+              </span>
+
+              <small>
+                SOIL MOISTURE
+              </small>
+
             </div>
 
             <h3>
@@ -345,11 +669,20 @@ function App() {
           </div>
 
 
+          {/* SLOPE */}
+
           <div className="stat-card">
 
             <div className="stat-top">
-              <span>⛰️</span>
-              <small>SLOPE</small>
+
+              <span>
+                ⛰️
+              </span>
+
+              <small>
+                SLOPE
+              </small>
+
             </div>
 
             <h3>
@@ -363,11 +696,20 @@ function App() {
           </div>
 
 
+          {/* AI RESULT */}
+
           <div className="stat-card">
 
             <div className="stat-top">
-              <span>🤖</span>
-              <small>AI RESULT</small>
+
+              <span>
+                🤖
+              </span>
+
+              <small>
+                AI RESULT
+              </small>
+
             </div>
 
             <h3>
@@ -383,15 +725,22 @@ function App() {
         </section>
 
 
-        {/* DASHBOARD GRID */}
+        {/* ===================================================
+            MAP + CURRENT PREDICTION
+        ==================================================== */}
+
         <section className="dashboard-grid">
 
-          {/* MAP */}
+          {/* =================================================
+              GIS MAP
+          ================================================== */}
+
           <div className="panel map-panel">
 
             <div className="panel-header">
 
               <div>
+
                 <span className="section-label">
                   GIS MONITORING
                 </span>
@@ -399,6 +748,7 @@ function App() {
                 <h2>
                   Regional Risk Map
                 </h2>
+
               </div>
 
               <button className="view-btn">
@@ -407,19 +757,26 @@ function App() {
 
             </div>
 
+
             <div className="map-container">
 
               <MapContainer
                 center={[26.2, 92.9]}
                 zoom={6}
                 scrollWheelZoom={true}
-                style={{ height: "450px", width: "100%" }}
+                style={{
+                  height: "450px",
+                  width: "100%",
+                }}
               >
 
                 <TileLayer
                   attribution="&copy; OpenStreetMap contributors"
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
+
+
+                {/* GUWAHATI */}
 
                 <CircleMarker
                   center={[26.1445, 91.7362]}
@@ -430,15 +787,27 @@ function App() {
                     fillOpacity: 0.6,
                   }}
                 >
+
                   <Popup>
-                    <strong>HIGH RISK ZONE</strong>
+
+                    <strong>
+                      HIGH RISK ZONE
+                    </strong>
+
                     <br />
+
                     Guwahati Region
+
                     <br />
+
                     Heavy rainfall detected
+
                   </Popup>
+
                 </CircleMarker>
 
+
+                {/* SHILLONG */}
 
                 <CircleMarker
                   center={[25.5788, 91.8933]}
@@ -449,13 +818,23 @@ function App() {
                     fillOpacity: 0.6,
                   }}
                 >
+
                   <Popup>
-                    <strong>MODERATE RISK</strong>
+
+                    <strong>
+                      MODERATE RISK
+                    </strong>
+
                     <br />
+
                     Shillong Region
+
                   </Popup>
+
                 </CircleMarker>
 
+
+                {/* ASSAM */}
 
                 <CircleMarker
                   center={[27.4728, 94.9120]}
@@ -466,11 +845,19 @@ function App() {
                     fillOpacity: 0.6,
                   }}
                 >
+
                   <Popup>
-                    <strong>LOW RISK</strong>
+
+                    <strong>
+                      LOW RISK
+                    </strong>
+
                     <br />
+
                     Assam Region
+
                   </Popup>
+
                 </CircleMarker>
 
               </MapContainer>
@@ -480,12 +867,16 @@ function App() {
           </div>
 
 
-          {/* PREDICTION */}
+          {/* =================================================
+              CURRENT AI PREDICTION
+          ================================================== */}
+
           <div className="panel prediction-panel">
 
             <div className="panel-header">
 
               <div>
+
                 <span className="section-label">
                   AI FORECAST
                 </span>
@@ -493,6 +884,7 @@ function App() {
                 <h2>
                   Risk Prediction
                 </h2>
+
               </div>
 
             </div>
@@ -509,56 +901,111 @@ function App() {
               </strong>
 
               <p>
-                Confidence: {result ? `${confidence}%` : "--"}
+                Confidence:{" "}
+                {result
+                  ? `${confidence}%`
+                  : "--"
+                }
               </p>
 
             </div>
 
 
+            {/* 6 HOURS */}
+
             <div className="prediction-item">
 
               <div>
-                <strong>6 Hours</strong>
-                <span>Forecast</span>
+
+                <strong>
+                  6 Hours
+                </strong>
+
+                <span>
+                  Forecast
+                </span>
+
               </div>
 
               <div className="prediction-bar">
-                <div style={{ width: "58%" }}></div>
+
+                <div
+                  style={{
+                    width: "58%",
+                  }}
+                ></div>
+
               </div>
 
-              <b>58%</b>
+              <b>
+                58%
+              </b>
 
             </div>
 
 
+            {/* 12 HOURS */}
+
             <div className="prediction-item">
 
               <div>
-                <strong>12 Hours</strong>
-                <span>Forecast</span>
+
+                <strong>
+                  12 Hours
+                </strong>
+
+                <span>
+                  Forecast
+                </span>
+
               </div>
 
               <div className="prediction-bar">
-                <div style={{ width: "71%" }}></div>
+
+                <div
+                  style={{
+                    width: "71%",
+                  }}
+                ></div>
+
               </div>
 
-              <b>71%</b>
+              <b>
+                71%
+              </b>
 
             </div>
 
 
+            {/* 24 HOURS */}
+
             <div className="prediction-item">
 
               <div>
-                <strong>24 Hours</strong>
-                <span>Forecast</span>
+
+                <strong>
+                  24 Hours
+                </strong>
+
+                <span>
+                  Forecast
+                </span>
+
               </div>
 
               <div className="prediction-bar">
-                <div style={{ width: "82%" }}></div>
+
+                <div
+                  style={{
+                    width: "82%",
+                  }}
+                ></div>
+
               </div>
 
-              <b>82%</b>
+              <b>
+                82%
+              </b>
 
             </div>
 
@@ -567,14 +1014,22 @@ function App() {
         </section>
 
 
-        {/* BOTTOM */}
+        {/* ===================================================
+            CASCADING DISASTER + COPILOT
+        ==================================================== */}
+
         <section className="bottom-grid">
+
+          {/* =================================================
+              CASCADE ANALYSIS
+          ================================================== */}
 
           <div className="panel cascade-panel">
 
             <div className="panel-header">
 
               <div>
+
                 <span className="section-label">
                   CASCADE ANALYSIS
                 </span>
@@ -582,6 +1037,7 @@ function App() {
                 <h2>
                   Potential Disaster Chain
                 </h2>
+
               </div>
 
             </div>
@@ -589,14 +1045,21 @@ function App() {
 
             <div className="cascade-flow">
 
+              {/* HEAVY RAIN */}
+
               <div className="cascade-node">
 
-                <span>🌧️</span>
+                <span>
+                  🌧️
+                </span>
 
-                <strong>Heavy Rain</strong>
+                <strong>
+                  Heavy Rain
+                </strong>
 
                 <small>
-                  {inputs.rainfall_24h} mm / 24h
+                  {inputs.rainfall_24h}
+                  {" "}mm / 24h
                 </small>
 
               </div>
@@ -607,14 +1070,21 @@ function App() {
               </div>
 
 
+              {/* SOIL */}
+
               <div className="cascade-node">
 
-                <span>💧</span>
+                <span>
+                  💧
+                </span>
 
-                <strong>Soil Saturation</strong>
+                <strong>
+                  Soil Saturation
+                </strong>
 
                 <small>
-                  {inputs.soil_moisture}% moisture
+                  {inputs.soil_moisture}%
+                  {" "}moisture
                 </small>
 
               </div>
@@ -624,16 +1094,24 @@ function App() {
                 →
               </div>
 
+
+              {/* LANDSLIDE */}
 
               <div
                 className={`cascade-node ${
-                  riskLevel === "High" ? "danger" : ""
+                  riskLevel === "High"
+                    ? "danger"
+                    : ""
                 }`}
               >
 
-                <span>⛰️</span>
+                <span>
+                  ⛰️
+                </span>
 
-                <strong>Landslide</strong>
+                <strong>
+                  Landslide
+                </strong>
 
                 <small>
                   AI Risk: {riskLevel}
@@ -647,15 +1125,23 @@ function App() {
               </div>
 
 
+              {/* ROAD BLOCKAGE */}
+
               <div
                 className={`cascade-node ${
-                  riskLevel === "High" ? "danger" : ""
+                  riskLevel === "High"
+                    ? "danger"
+                    : ""
                 }`}
               >
 
-                <span>🛣️</span>
+                <span>
+                  🛣️
+                </span>
 
-                <strong>Road Blockage</strong>
+                <strong>
+                  Road Blockage
+                </strong>
 
                 <small>
                   Potential impact
@@ -667,6 +1153,10 @@ function App() {
 
           </div>
 
+
+          {/* =================================================
+              AI COPILOT
+          ================================================== */}
 
           <div className="panel copilot-panel">
 
@@ -685,8 +1175,9 @@ function App() {
               </h2>
 
               <p>
-                Ask about risk levels, affected locations,
-                emergency actions, and disaster-management
+                Ask about risk levels, affected
+                locations, emergency actions,
+                and disaster-management
                 guidelines.
               </p>
 
@@ -701,8 +1192,13 @@ function App() {
         </section>
 
 
+        {/* ===================================================
+            FOOTER
+        ==================================================== */}
+
         <footer>
-          LANDGUARD AI • AI-powered disaster intelligence platform
+          LANDGUARD AI • AI-powered disaster
+          intelligence platform
         </footer>
 
       </main>
