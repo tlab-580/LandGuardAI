@@ -165,7 +165,6 @@ def forecast_7days(data: ForecastInput):
             - 2
         )
 
-
         current_soil_moisture = max(
             0,
             min(
@@ -197,14 +196,11 @@ def forecast_7days(data: ForecastInput):
             input_data
         )[0]
 
-
         probabilities = model.predict_proba(
             input_data
         )[0]
 
-
         classes = model.classes_
-
 
         confidence = probabilities[
             list(classes).index(prediction)
@@ -216,13 +212,16 @@ def forecast_7days(data: ForecastInput):
         # ----------------------------------------------------
 
         forecast_results.append({
-    "day": day,
-    "date": data.forecast_dates[day - 1],
-    "rainfall": round(rainfall, 2),
-    "soil_moisture": round(current_soil_moisture, 2),
-    "risk_level": prediction,
-    "risk_probability": round(float(confidence) * 100, 2)
-})
+            "day": day,
+            "date": data.forecast_dates[day - 1],
+            "rainfall": round(rainfall, 2),
+            "soil_moisture": round(current_soil_moisture, 2),
+            "risk_level": prediction,
+            "risk_probability": round(
+                float(confidence) * 100,
+                2
+            )
+        })
 
 
     # --------------------------------------------------------
@@ -239,14 +238,11 @@ def forecast_7days(data: ForecastInput):
 # WEATHER FORECAST FEED
 # ============================================================
 
-# ============================================================
-# WEATHER FORECAST FEED
-# ============================================================
-
 @app.get("/weather-forecast")
 def weather_forecast():
 
-    from urllib.request import urlopen
+    from urllib.request import Request, urlopen
+    from urllib.error import HTTPError, URLError
     import json
 
     latitude = 26.1445
@@ -261,28 +257,140 @@ def weather_forecast():
         "&timezone=auto"
     )
 
-    with urlopen(url, timeout=15) as response:
-        weather_data = json.loads(
-            response.read().decode("utf-8")
+    try:
+
+        # ----------------------------------------------------
+        # Request weather data
+        # ----------------------------------------------------
+
+        request = Request(
+            url,
+            headers={
+                "User-Agent": "LANDGUARD-AI/1.0"
+            }
         )
 
-    rainfall = weather_data["daily"]["rain_sum"]
-    dates = weather_data["daily"]["time"]
+        with urlopen(
+            request,
+            timeout=15
+        ) as response:
 
-    forecast = []
+            weather_data = json.loads(
+                response.read().decode("utf-8")
+            )
 
-    for day, (date, rain) in enumerate(
-        zip(dates, rainfall),
-        start=1
-    ):
-        forecast.append({
-            "day": day,
-            "date": date,
-            "rainfall": round(float(rain or 0), 2)
-        })
 
-    return {
-        "location": "Guwahati",
-        "source": "Open-Meteo Weather Forecast",
-        "forecast": forecast
-    }
+        # ----------------------------------------------------
+        # Extract rainfall and dates
+        # ----------------------------------------------------
+
+        rainfall = weather_data["daily"]["rain_sum"]
+
+        dates = weather_data["daily"]["time"]
+
+
+        # ----------------------------------------------------
+        # Build forecast
+        # ----------------------------------------------------
+
+        forecast = []
+
+        for day, (date, rain) in enumerate(
+            zip(dates, rainfall),
+            start=1
+        ):
+
+            forecast.append({
+                "day": day,
+                "date": date,
+                "rainfall": round(
+                    float(rain or 0),
+                    2
+                )
+            })
+
+
+        # ----------------------------------------------------
+        # Return live weather forecast
+        # ----------------------------------------------------
+
+        return {
+            "location": "Guwahati",
+            "source": "Open-Meteo Weather Forecast",
+            "live": True,
+            "forecast": forecast
+        }
+
+
+    except (
+        HTTPError,
+        URLError,
+        TimeoutError,
+        KeyError,
+        json.JSONDecodeError
+    ) as error:
+
+        # ----------------------------------------------------
+        # Log weather API failure
+        # ----------------------------------------------------
+
+        print(
+            f"Weather API unavailable: {error}"
+        )
+
+
+        # ----------------------------------------------------
+        # Safe fallback forecast
+        #
+        # Used only when Open-Meteo is unavailable,
+        # rate-limited, or temporarily fails.
+        # ----------------------------------------------------
+
+        fallback_dates = [
+            "2026-09-20",
+            "2026-09-21",
+            "2026-09-22",
+            "2026-09-23",
+            "2026-09-24",
+            "2026-09-25",
+            "2026-09-26"
+        ]
+
+        fallback_rainfall = [
+            3.2,
+            0.6,
+            2.7,
+            3.2,
+            0.0,
+            1.8,
+            3.3
+        ]
+
+
+        forecast = []
+
+        for day, (date, rain) in enumerate(
+            zip(
+                fallback_dates,
+                fallback_rainfall
+            ),
+            start=1
+        ):
+
+            forecast.append({
+                "day": day,
+                "date": date,
+                "rainfall": rain
+            })
+
+
+        # ----------------------------------------------------
+        # Return fallback forecast
+        # ----------------------------------------------------
+
+        return {
+            "location": "Guwahati",
+            "source": "LANDGUARD fallback forecast",
+            "live": False,
+            "forecast": forecast
+        }
