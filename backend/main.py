@@ -7,13 +7,13 @@ import joblib
 
 
 # ============================================================
-# LANDGUARD AI - FASTAPI APPLICATION
+# LANDGUARD AI 2.0 - FASTAPI APPLICATION
 # ============================================================
 
 app = FastAPI(
-    title="LANDGUARD AI",
-    description="AI-powered landslide early warning and disaster intelligence system",
-    version="1.0.0"
+    title="LANDGUARD AI 2.0",
+    description="AI-powered heavy rainfall early warning and inundation prediction system",
+    version="2.0.0"
 )
 
 
@@ -37,36 +37,42 @@ app.add_middleware(
 
 
 # ============================================================
-# LOAD TRAINED ML MODEL
+# LOAD TRAINED INUNDATION MODEL
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-model = joblib.load(
-    BASE_DIR / "ml" / "models" / "landslide_risk_model.pkl"
+MODEL_PATH = (
+    BASE_DIR
+    / "ml"
+    / "models"
+    / "inundation_risk_model.pkl"
 )
 
+model = joblib.load(MODEL_PATH)
+
 
 # ============================================================
-# INPUT STRUCTURES
+# INPUT STRUCTURE
 # ============================================================
 
-class RiskInput(BaseModel):
+class InundationRiskInput(BaseModel):
+
+    rainfall_1h: float
+    rainfall_6h: float
     rainfall_24h: float
+    rainfall_3d: float
     rainfall_7d: float
-    soil_moisture: float
-    slope_angle: float
-    elevation: float
-    ndvi: float
 
+    forecast_rainfall_6h: float
+    forecast_rainfall_24h: float
+    forecast_rainfall_7d: float
 
-class ForecastInput(BaseModel):
-    rainfall_forecast: list
-    forecast_dates: list
     soil_moisture: float
-    slope_angle: float
     elevation: float
-    ndvi: float
+    slope: float
+    distance_to_river: float
+    drainage_density: float
 
 
 # ============================================================
@@ -75,10 +81,11 @@ class ForecastInput(BaseModel):
 
 @app.get("/")
 def home():
+
     return {
-        "project": "LANDGUARD AI",
+        "project": "LANDGUARD AI 2.0",
         "status": "running",
-        "message": "Landslide Intelligence System is online"
+        "message": "Heavy Rainfall and Inundation Intelligence System is online"
     }
 
 
@@ -88,309 +95,124 @@ def home():
 
 @app.get("/health")
 def health():
+
     return {
         "status": "healthy",
-        "model": "loaded"
+        "model": "inundation_risk_model",
+        "model_loaded": True,
+        "version": "2.0.0"
     }
 
 
 # ============================================================
-# CURRENT RISK PREDICTION
+# INUNDATION RISK PREDICTION
 # ============================================================
 
-@app.post("/predict-risk")
-def predict_risk(data: RiskInput):
+@app.post("/predict-inundation-risk")
+def predict_inundation_risk(data: InundationRiskInput):
+
+    # --------------------------------------------------------
+    # Prepare model input
+    # --------------------------------------------------------
 
     input_data = pd.DataFrame([{
+        "rainfall_1h": data.rainfall_1h,
+        "rainfall_6h": data.rainfall_6h,
         "rainfall_24h": data.rainfall_24h,
+        "rainfall_3d": data.rainfall_3d,
         "rainfall_7d": data.rainfall_7d,
+
+        "forecast_rainfall_6h": data.forecast_rainfall_6h,
+        "forecast_rainfall_24h": data.forecast_rainfall_24h,
+        "forecast_rainfall_7d": data.forecast_rainfall_7d,
+
         "soil_moisture": data.soil_moisture,
-        "slope_angle": data.slope_angle,
         "elevation": data.elevation,
-        "ndvi": data.ndvi
+        "slope": data.slope,
+        "distance_to_river": data.distance_to_river,
+        "drainage_density": data.drainage_density
     }])
 
+
+    # --------------------------------------------------------
+    # Predict risk
+    # --------------------------------------------------------
+
     prediction = model.predict(input_data)[0]
+
+
+    # --------------------------------------------------------
+    # Prediction probabilities
+    # --------------------------------------------------------
 
     probabilities = model.predict_proba(input_data)[0]
 
     classes = model.classes_
 
-    confidence = probabilities[
-        list(classes).index(prediction)
-    ]
-
-    return {
-        "risk_level": prediction,
-        "confidence": round(
-            float(confidence) * 100,
+    class_probabilities = {
+        risk_class: round(
+            float(probability) * 100,
             2
-        ),
-        "inputs": data.model_dump()
+        )
+        for risk_class, probability
+        in zip(classes, probabilities)
     }
 
 
-# ============================================================
-# 7-DAY LANDSLIDE FORECAST
-# ============================================================
+    # --------------------------------------------------------
+    # Model confidence
+    # --------------------------------------------------------
 
-@app.post("/forecast-7days")
-def forecast_7days(data: ForecastInput):
-
-    forecast_results = []
-
-    current_soil_moisture = data.soil_moisture
-
-    cumulative_rainfall = 0
-
-    for day, rainfall in enumerate(
-        data.rainfall_forecast,
-        start=1
-    ):
-
-        # ----------------------------------------------------
-        # Update cumulative rainfall
-        # ----------------------------------------------------
-
-        cumulative_rainfall += rainfall
-
-
-        # ----------------------------------------------------
-        # Simple soil moisture simulation
-        # ----------------------------------------------------
-
-        current_soil_moisture = (
-            current_soil_moisture
-            + (rainfall * 0.08)
-            - 2
-        )
-
-        current_soil_moisture = max(
-            0,
-            min(
-                100,
-                current_soil_moisture
-            )
-        )
-
-
-        # ----------------------------------------------------
-        # Prepare ML input
-        # ----------------------------------------------------
-
-        input_data = pd.DataFrame([{
-            "rainfall_24h": rainfall,
-            "rainfall_7d": cumulative_rainfall,
-            "soil_moisture": current_soil_moisture,
-            "slope_angle": data.slope_angle,
-            "elevation": data.elevation,
-            "ndvi": data.ndvi
-        }])
-
-
-        # ----------------------------------------------------
-        # Predict risk
-        # ----------------------------------------------------
-
-        prediction = model.predict(
-            input_data
-        )[0]
-
-        probabilities = model.predict_proba(
-            input_data
-        )[0]
-
-        classes = model.classes_
-
-        confidence = probabilities[
-            list(classes).index(prediction)
-        ]
-
-
-        # ----------------------------------------------------
-        # Store forecast result
-        # ----------------------------------------------------
-
-        forecast_results.append({
-            "day": day,
-            "date": data.forecast_dates[day - 1],
-            "rainfall": round(rainfall, 2),
-            "soil_moisture": round(current_soil_moisture, 2),
-            "risk_level": prediction,
-            "risk_probability": round(
-                float(confidence) * 100,
-                2
-            )
-        })
+    confidence = max(probabilities) * 100
 
 
     # --------------------------------------------------------
-    # Return 7-day forecast
+    # Feature importance
     # --------------------------------------------------------
 
-    return {
-        "forecast_days": 7,
-        "forecast": forecast_results
-    }
-
-
-# ============================================================
-# WEATHER FORECAST FEED
-# ============================================================
-
-@app.get("/weather-forecast")
-def weather_forecast():
-
-    from urllib.request import Request, urlopen
-    from urllib.error import HTTPError, URLError
-    import json
-
-    latitude = 26.1445
-    longitude = 91.7362
-
-    url = (
-        "https://api.open-meteo.com/v1/forecast"
-        f"?latitude={latitude}"
-        f"&longitude={longitude}"
-        "&daily=rain_sum"
-        "&forecast_days=7"
-        "&timezone=auto"
+    feature_importance = dict(
+        zip(
+            input_data.columns,
+            model.feature_importances_
+        )
     )
 
-    try:
+    top_features = sorted(
+        feature_importance.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )[:5]
 
-        # ----------------------------------------------------
-        # Request weather data
-        # ----------------------------------------------------
 
-        request = Request(
-            url,
-            headers={
-                "User-Agent": "LANDGUARD-AI/1.0"
-            }
-        )
-
-        with urlopen(
-            request,
-            timeout=15
-        ) as response:
-
-            weather_data = json.loads(
-                response.read().decode("utf-8")
+    top_contributing_features = [
+        {
+            "feature": feature,
+            "importance": round(
+                float(importance) * 100,
+                2
             )
-
-
-        # ----------------------------------------------------
-        # Extract rainfall and dates
-        # ----------------------------------------------------
-
-        rainfall = weather_data["daily"]["rain_sum"]
-
-        dates = weather_data["daily"]["time"]
-
-
-        # ----------------------------------------------------
-        # Build forecast
-        # ----------------------------------------------------
-
-        forecast = []
-
-        for day, (date, rain) in enumerate(
-            zip(dates, rainfall),
-            start=1
-        ):
-
-            forecast.append({
-                "day": day,
-                "date": date,
-                "rainfall": round(
-                    float(rain or 0),
-                    2
-                )
-            })
-
-
-        # ----------------------------------------------------
-        # Return live weather forecast
-        # ----------------------------------------------------
-
-        return {
-            "location": "Guwahati",
-            "source": "Open-Meteo Weather Forecast",
-            "live": True,
-            "forecast": forecast
         }
+        for feature, importance in top_features
+    ]
 
 
-    except (
-        HTTPError,
-        URLError,
-        TimeoutError,
-        KeyError,
-        json.JSONDecodeError
-    ) as error:
+    # --------------------------------------------------------
+    # Return result
+    # --------------------------------------------------------
 
-        # ----------------------------------------------------
-        # Log weather API failure
-        # ----------------------------------------------------
+    return {
 
-        print(
-            f"Weather API unavailable: {error}"
-        )
+        "risk_level": prediction,
 
+        "confidence": round(
+            float(confidence),
+            2
+        ),
 
-        # ----------------------------------------------------
-        # Safe fallback forecast
-        #
-        # Used only when Open-Meteo is unavailable,
-        # rate-limited, or temporarily fails.
-        # ----------------------------------------------------
+        "probabilities": class_probabilities,
 
-        fallback_dates = [
-            "2026-09-20",
-            "2026-09-21",
-            "2026-09-22",
-            "2026-09-23",
-            "2026-09-24",
-            "2026-09-25",
-            "2026-09-26"
-        ]
+        "top_contributing_features":
+            top_contributing_features,
 
-        fallback_rainfall = [
-            3.2,
-            0.6,
-            2.7,
-            3.2,
-            0.0,
-            1.8,
-            3.3
-        ]
-
-
-        forecast = []
-
-        for day, (date, rain) in enumerate(
-            zip(
-                fallback_dates,
-                fallback_rainfall
-            ),
-            start=1
-        ):
-
-            forecast.append({
-                "day": day,
-                "date": date,
-                "rainfall": rain
-            })
-
-
-        # ----------------------------------------------------
-        # Return fallback forecast
-        # ----------------------------------------------------
-
-        return {
-            "location": "Guwahati",
-            "source": "LANDGUARD fallback forecast",
-            "live": False,
-            "forecast": forecast
-        }
+        "inputs": data.model_dump()
+    }
