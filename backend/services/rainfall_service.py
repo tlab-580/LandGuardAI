@@ -12,8 +12,9 @@ from urllib.error import URLError, HTTPError
 # OPEN-METEO / NWP CONFIGURATION
 # ============================================================
 
-ECMWF_API_URL = "https://api.open-meteo.com/v1/ecmwf"
+
 GFS_API_URL = "https://api.open-meteo.com/v1/gfs"
+OPEN_METEO_API_URL = "https://api.open-meteo.com/v1/forecast"
 MET_NORWAY_API_URL = (
     "https://api.met.no/weatherapi/locationforecast/2.0/compact"
 )
@@ -57,7 +58,8 @@ def _cache_key(latitude: float, longitude: float):
 def _get_cached_weather(
     latitude: float,
     longitude: float,
-    ttl_seconds: int
+    ttl_seconds: int,
+    required_days: int = 1
 ):
     key = _cache_key(latitude, longitude)
 
@@ -72,17 +74,46 @@ def _get_cached_weather(
         if age > ttl_seconds:
             return None
 
-        return cached
+        try:
+            available_days = len(
+                _aggregate_daily_forecast(
+                    cached["data"]
+                )
+            )
+        except Exception:
+            return None
 
+        if available_days < required_days:
+            return None
+
+        return cached
 
 def _get_stale_cached_weather(
     latitude: float,
-    longitude: float
+    longitude: float,
+    required_days: int = 1
 ):
     key = _cache_key(latitude, longitude)
 
     with _CACHE_LOCK:
-        return _OPEN_METEO_CACHE.get(key)
+        cached = _OPEN_METEO_CACHE.get(key)
+
+        if not cached:
+            return None
+
+        try:
+            available_days = len(
+                _aggregate_daily_forecast(
+                    cached["data"]
+                )
+            )
+        except Exception:
+            return None
+
+        if available_days < required_days:
+            return None
+
+        return cached
 
 
 def _store_cached_weather(
@@ -90,7 +121,8 @@ def _store_cached_weather(
     longitude: float,
     data: dict,
     model: str,
-    source_url: str
+    source_url: str,
+    provider: str = "Open-Meteo"
 ):
     key = _cache_key(latitude, longitude)
 
@@ -99,10 +131,9 @@ def _store_cached_weather(
             "timestamp": time.time(),
             "data": data,
             "model": model,
-            "provider": "Open-Meteo",
+            "provider": provider,
             "source_url": source_url,
         }
-
 
 # ============================================================
 # REQUEST BUILDERS
@@ -309,11 +340,12 @@ def _request_model(
                 )
 
             _store_cached_weather(
-                latitude=latitude,
-                longitude=longitude,
-                data=data,
-                model=model_name,
-                source_url=url
+               latitude=latitude,
+               longitude=longitude,
+               data=met_data,
+               model="MET Norway Locationforecast",
+               source_url=met_url,
+               provider="MET Norway"
             )
 
             return data, model_name, False
@@ -386,25 +418,26 @@ def _get_weather_data(
     """
     Provider order:
 
-    1. Recent successful cache
+    1. Recent successful cache with sufficient horizon
     2. ECMWF IFS through Open-Meteo
     3. NOAA GFS through Open-Meteo
-    4. MET Norway Locationforecast
-    5. Stale successful cache
+    4. Open-Meteo Best Match
+    5. MET Norway Locationforecast
+    6. Stale successful cache with sufficient horizon
 
-    MET Norway is used as a free no-key fallback when Open-Meteo is
-    rate-limited or temporarily unavailable. It supplies up to nine
-    days of global forecast data.
+    MET Norway is the final free no-key fallback when the
+    Open-Meteo providers are unavailable. It supplies up to
+    nine days of global forecast data.
 
     The result records which NWP model actually supplied the data.
     """
 
     cached = _get_cached_weather(
-        latitude=latitude,
-        longitude=longitude,
-        ttl_seconds=ttl_seconds
-    )
-
+    latitude=latitude,
+    longitude=longitude,
+    ttl_seconds=ttl_seconds,
+    required_days=days
+)
     if cached is not None:
         return cached, False
 
@@ -418,6 +451,10 @@ def _get_weather_data(
         (
             GFS_API_URL,
             "NOAA GFS"
+        ),
+        (
+            OPEN_METEO_API_URL,
+            "Open-Meteo Best Match"
         ),
     ]
 
@@ -435,8 +472,15 @@ def _get_weather_data(
 
             cached_result = _get_stale_cached_weather(
                 latitude,
-                longitude
+                longitude,
+                required_days=days
             )
+
+            if cached_result is None:
+                raise RuntimeError(
+                    f"{model_name} returned insufficient "
+                    f"forecast data for a {days}-day request."
+                )
 
             return cached_result, False
 
@@ -454,6 +498,19 @@ def _get_weather_data(
             longitude=longitude
         )
 
+        met_days = len(
+            _aggregate_daily_forecast(
+                met_data
+            )
+        )
+
+        if met_days < days:
+            raise RuntimeError(
+                "MET Norway Locationforecast returned "
+                f"{met_days} forecast days, but {days} "
+                "days were requested."
+            )
+
         _store_cached_weather(
             latitude=latitude,
             longitude=longitude,
@@ -464,19 +521,27 @@ def _get_weather_data(
 
         cached_result = _get_stale_cached_weather(
             latitude,
-            longitude
+            longitude,
+            required_days=days
         )
+
+        if cached_result is None:
+            raise RuntimeError(
+                "MET Norway forecast could not satisfy "
+                f"the requested {days}-day horizon."
+            )
 
         return cached_result, False
 
-    except RuntimeError as error:
+    except (RuntimeError, TypeError, ValueError) as error:
         errors.append(
             f"MET Norway Locationforecast: {error}"
         )
 
     stale = _get_stale_cached_weather(
         latitude,
-        longitude
+        longitude,
+        required_days=days
     )
 
     if stale is not None:
@@ -734,8 +799,10 @@ def generate_meteorological_forecast(
     Primary model:
         ECMWF IFS
 
-    Fallback model:
+    Fallback models:
         NOAA GFS through Open-Meteo
+        Open-Meteo Best Match
+        MET Norway Locationforecast
 
     The returned payload explicitly identifies the model that
     supplied the data. No synthetic rainfall values are created.
@@ -870,6 +937,10 @@ def generate_current_weather(
     Returns current meteorological conditions from the same NWP
     data pipeline used by the forecast endpoint.
 
+    Only one forecast day is requested because the endpoint needs
+    current conditions, not a multi-day forecast. This also allows
+    the MET Norway fallback to satisfy the request.
+
     Provider/model are reported explicitly, and the stale-cache
     state is exposed when upstream services are temporarily down.
     """
@@ -877,7 +948,7 @@ def generate_current_weather(
     cached, used_stale_cache = _get_weather_data(
         latitude=latitude,
         longitude=longitude,
-        days=15,
+        days=1,
         ttl_seconds=CURRENT_WEATHER_CACHE_TTL_SECONDS
     )
 

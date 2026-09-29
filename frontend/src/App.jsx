@@ -1365,7 +1365,7 @@ function App() {
               </h2>
 
               <p>
-                Numerical Weather Prediction using{"."}
+                Numerical Weather Prediction using{" "}
                 {meteorologicalSource}. Forecast values are obtained
                 from a real meteorological forecast model
                 rather than a synthetic scenario.
@@ -1992,15 +1992,13 @@ function App() {
               </h2>
 
               <p>
-                Predictive risk assessment using
-real{" "} {meteorologicalSource} rainfall input.
-               
-              </p>
+  Predictive risk assessment using real{" "}
+  {meteorologicalSource} rainfall input.
+</p>
 
               <p className="weather-source">
 
                 🌍 {meteorologicalSource} • REAL NWP RAINFALL INPUT •
-7-DAY INUNDATION OUTLOOK
                 7-DAY INUNDATION OUTLOOK
 
               </p>
