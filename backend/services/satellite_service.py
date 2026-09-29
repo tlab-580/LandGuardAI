@@ -12,7 +12,16 @@ from dotenv import dotenv_values
 
 
 # ============================================================
-# LOAD CREDENTIALS FROM backend/.env
+# LOAD COPERNICUS CREDENTIALS
+# ============================================================
+#
+# Production (Render):
+#   Read CDSE_CLIENT_ID and CDSE_CLIENT_SECRET from
+#   environment variables.
+#
+# Local development:
+#   Fall back to backend/.env when environment variables
+#   are not set.
 # ============================================================
 
 BACKEND_DIR = os.path.dirname(
@@ -28,12 +37,14 @@ ENV_FILE = os.path.join(
 
 env_values = dotenv_values(ENV_FILE)
 
-CDSE_CLIENT_ID = env_values.get(
-    "CDSE_CLIENT_ID"
+CDSE_CLIENT_ID = (
+    os.getenv("CDSE_CLIENT_ID")
+    or env_values.get("CDSE_CLIENT_ID")
 )
 
-CDSE_CLIENT_SECRET = env_values.get(
-    "CDSE_CLIENT_SECRET"
+CDSE_CLIENT_SECRET = (
+    os.getenv("CDSE_CLIENT_SECRET")
+    or env_values.get("CDSE_CLIENT_SECRET")
 )
 
 
@@ -56,18 +67,18 @@ def get_cdse_access_token():
     Authenticate with Copernicus Data Space Ecosystem
     using OAuth2 Client Credentials.
 
-    Credentials are loaded from:
-        backend/.env
+    Credentials are loaded from environment variables first,
+    with backend/.env used as a local-development fallback.
     """
 
     if not CDSE_CLIENT_ID:
         raise RuntimeError(
-            "CDSE_CLIENT_ID is not configured in backend/.env"
+            "CDSE_CLIENT_ID is not configured in the environment or backend/.env"
         )
 
     if not CDSE_CLIENT_SECRET:
         raise RuntimeError(
-            "CDSE_CLIENT_SECRET is not configured in backend/.env"
+            "CDSE_CLIENT_SECRET is not configured in the environment or backend/.env"
         )
 
     payload = urlencode(
