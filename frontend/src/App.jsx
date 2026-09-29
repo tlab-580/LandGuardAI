@@ -70,6 +70,10 @@ function App() {
 
   const [meteorologicalForecast, setMeteorologicalForecast] =
     useState([]);
+  const meteorologicalSource =
+  meteorologicalForecast?.[0]?.source ||
+  meteorologicalForecast?.[0]?.provider ||
+  "NWP";
 
   const [currentWeather, setCurrentWeather] =
     useState(null);
@@ -647,7 +651,7 @@ function App() {
   //
   // REAL PIPELINE:
   //
-  // ECMWF IFS
+  // REAL NWP
   //     ↓
   // Real rainfall forecast
   //     ↓
@@ -689,7 +693,7 @@ function App() {
 
 
         // -----------------------------------------------------
-        // EXTRACT REAL ECMWF RAINFALL
+        // EXTRACT REAL NWP RAINFALL
         // -----------------------------------------------------
 
         const realRainfallForecast =
@@ -758,7 +762,7 @@ function App() {
 
 
         // -----------------------------------------------------
-        // LOG REAL ECMWF VALUES
+        // LOG REAL NWP VALUES
         // -----------------------------------------------------
 
         console.log(
@@ -1362,7 +1366,7 @@ function App() {
 
               <p>
                 Numerical Weather Prediction using
-                ECMWF IFS data. Forecast values are obtained
+                {meteorologicalSource}. Forecast values are obtained
                 from a real meteorological forecast model
                 rather than a synthetic scenario.
               </p>
@@ -1371,7 +1375,7 @@ function App() {
 
 
             <div className="meteorological-source-badge">
-              🌍 ECMWF IFS • NWP
+              🌍{meteorologicalSource} • NWP
             </div>
 
           </div>
@@ -1408,7 +1412,7 @@ function App() {
                   </span>
 
                   <span>
-                    📡 Source: ECMWF IFS
+                   📡 Source: ECMWF IFS
                   </span>
 
                   <span>
@@ -1507,7 +1511,7 @@ function App() {
 
 
                         <div className="meteo-source">
-                          ECMWF IFS • NWP
+                         {meteorologicalSource} • NWP
                         </div>
 
                       </div>
@@ -1989,12 +1993,14 @@ function App() {
 
               <p>
                 Predictive risk assessment using
+real {meteorologicalSource} rainfall input.
                 real ECMWF IFS rainfall input.
               </p>
 
               <p className="weather-source">
 
-                🌍 ECMWF IFS • REAL NWP RAINFALL INPUT •
+                🌍 {meteorologicalSource} • REAL NWP RAINFALL INPUT •
+7-DAY INUNDATION OUTLOOK
                 7-DAY INUNDATION OUTLOOK
 
               </p>
