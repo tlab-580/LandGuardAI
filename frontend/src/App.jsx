@@ -762,7 +762,7 @@ function App() {
         // -----------------------------------------------------
 
         console.log(
-          "ECMWF rainfall used for AI forecast:",
+          "Live NWP used for AI forecast:",
           realRainfallForecast
         );
 
