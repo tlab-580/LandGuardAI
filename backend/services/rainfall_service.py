@@ -1,3 +1,4 @@
+import os
 import json
 import threading
 import time
@@ -12,8 +13,23 @@ from urllib.error import URLError, HTTPError
 # OPEN-METEO / NWP CONFIGURATION
 # ============================================================
 
-ECMWF_API_URL = "https://api.open-meteo.com/v1/ecmwf"
-GFS_API_URL = "https://api.open-meteo.com/v1/gfs"
+# Free endpoints are retained as a local-development fallback.
+FREE_ECMWF_API_URL = "https://api.open-meteo.com/v1/ecmwf"
+FREE_GFS_API_URL = "https://api.open-meteo.com/v1/gfs"
+
+# Customer API provides a dedicated quota and accepts the same
+# request syntax, with the addition of the API key.
+CUSTOMER_ECMWF_API_URL = (
+    "https://customer-api.open-meteo.com/v1/ecmwf"
+)
+CUSTOMER_GFS_API_URL = (
+    "https://customer-api.open-meteo.com/v1/gfs"
+)
+
+OPEN_METEO_API_KEY = os.getenv(
+    "OPEN_METEO_API_KEY",
+    ""
+).strip()
 
 # Cache successful provider responses in memory so repeated
 # dashboard requests do not repeatedly hit the external API.
@@ -139,6 +155,15 @@ def _request_model(
         longitude,
         days
     )
+
+    if base_url.startswith("https://customer-api.open-meteo.com"):
+        if not OPEN_METEO_API_KEY:
+            raise RuntimeError(
+                "OPEN_METEO_API_KEY is not configured for the "
+                "Open-Meteo customer API."
+            )
+
+        params["apikey"] = OPEN_METEO_API_KEY
 
     url = (
         base_url
@@ -270,16 +295,31 @@ def _get_weather_data(
 
     errors = []
 
-    providers = [
-        (
-            ECMWF_API_URL,
-            "ECMWF IFS"
-        ),
-        (
-            GFS_API_URL,
-            "NOAA GFS"
-        ),
-    ]
+    if OPEN_METEO_API_KEY:
+        providers = [
+            (
+                CUSTOMER_ECMWF_API_URL,
+                "ECMWF IFS"
+            ),
+            (
+                CUSTOMER_GFS_API_URL,
+                "NOAA GFS"
+            ),
+        ]
+    else:
+        # Local development can still use the free endpoints.
+        # Render/production should set OPEN_METEO_API_KEY so the
+        # customer endpoint with dedicated capacity is used.
+        providers = [
+            (
+                FREE_ECMWF_API_URL,
+                "ECMWF IFS"
+            ),
+            (
+                FREE_GFS_API_URL,
+                "NOAA GFS"
+            ),
+        ]
 
     for base_url, model_name in providers:
 
@@ -622,6 +662,12 @@ def generate_meteorological_forecast(
         result["live"] = True
         result["cache_status"] = "fresh_or_recent_cached_data"
 
+    result["api_access"] = (
+        "Open-Meteo customer API"
+        if OPEN_METEO_API_KEY
+        else "Open-Meteo free API"
+    )
+
     return result
 
 
@@ -744,5 +790,11 @@ def generate_current_weather(
     else:
         result["live"] = True
         result["cache_status"] = "fresh_or_recent_cached_data"
+
+    result["api_access"] = (
+        "Open-Meteo customer API"
+        if OPEN_METEO_API_KEY
+        else "Open-Meteo free API"
+    )
 
     return result
