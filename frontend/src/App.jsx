@@ -224,127 +224,264 @@ function App() {
   // =========================================================
 
   const fetchMeteorologicalForecast =
-    async () => {
+  async () => {
 
-      setMeteorologicalLoading(true);
-      setMeteorologicalError("");
+    setMeteorologicalLoading(true);
+    setMeteorologicalError("");
 
-      try {
+    try {
 
-        const latitude = 26.1445;
-        const longitude = 91.7362;
+      const latitude = 26.1445;
+      const longitude = 91.7362;
 
-        const apiUrl =
-          import.meta.env.VITE_API_URL;
+      const apiUrl =
+        import.meta.env.VITE_API_URL;
 
-
-        console.log(
-          "Meteorological API URL:",
-          apiUrl
+      if (!apiUrl) {
+        throw new Error(
+          "VITE_API_URL is not configured."
         );
+      }
 
 
-        if (!apiUrl) {
+      // =====================================================
+      // 1. TRY LANDGUARD BACKEND FIRST
+      // =====================================================
 
-          throw new Error(
-            "VITE_API_URL is not configured."
-          );
+      const backendUrl =
+        `${apiUrl}/meteorological-forecast` +
+        `?latitude=${latitude}` +
+        `&longitude=${longitude}` +
+        `&days=15`;
 
-        }
+      console.log(
+        "Fetching meteorological forecast:",
+        backendUrl
+      );
 
+      const backendResponse =
+        await fetch(backendUrl);
 
-        const url =
-          `${apiUrl}/meteorological-forecast` +
-          `?latitude=${latitude}` +
-          `&longitude=${longitude}` +
-          `&days=15`;
+      console.log(
+        "Meteorological backend response status:",
+        backendResponse.status
+      );
 
+      if (backendResponse.ok) {
 
-        console.log(
-          "Fetching meteorological forecast:",
-          url
-        );
-
-
-        const response =
-          await fetch(url);
-
-
-        console.log(
-          "Meteorological response status:",
-          response.status
-        );
-
-
-        if (!response.ok) {
-
-          const errorText =
-            await response.text();
-
-          throw new Error(
-            `Meteorological API error ${response.status}: ${errorText}`
-          );
-
-        }
-
-
-        const data =
-          await response.json();
-
+        const backendData =
+          await backendResponse.json();
 
         console.log(
-          "Meteorological forecast response:",
-          data
+          "Meteorological backend response:",
+          backendData
         );
 
 
         if (
-          data.status !== "success" ||
-          !Array.isArray(data.forecast)
+          backendData.status === "success" &&
+          Array.isArray(backendData.forecast)
         ) {
 
-          throw new Error(
-            "Invalid meteorological forecast response."
+          // Accept backend forecast only when it
+          // actually satisfies the requested 15-day horizon.
+          if (
+            backendData.forecast.length >= 15
+          ) {
+
+            setMeteorologicalForecast(
+              backendData.forecast.slice(0, 15)
+            );
+
+            console.log(
+              "15-day forecast supplied by LandGuard backend:",
+              backendData.source
+            );
+
+            return;
+          }
+
+          console.warn(
+            `Backend returned only ${backendData.forecast.length} days. ` +
+            "Fetching 15-day ECMWF forecast directly from Open-Meteo."
           );
 
         }
 
+      }
 
-        setMeteorologicalForecast(
-          data.forecast
+
+      // =====================================================
+      // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
+      // =====================================================
+
+      const directParams =
+        new URLSearchParams({
+          latitude: String(latitude),
+          longitude: String(longitude),
+
+          daily:
+            "rain_sum," +
+            "precipitation_sum," +
+            "temperature_2m_max," +
+            "temperature_2m_min," +
+            "precipitation_hours",
+
+          timezone: "auto",
+          forecast_days: "15"
+        });
+
+
+      const directUrl =
+        "https://api.open-meteo.com/v1/ecmwf?" +
+        directParams.toString();
+
+
+      console.log(
+        "Fetching direct 15-day ECMWF forecast:",
+        directUrl
+      );
+
+
+      const directResponse =
+        await fetch(directUrl);
+
+
+      console.log(
+        "Direct ECMWF response status:",
+        directResponse.status
+      );
+
+
+      if (!directResponse.ok) {
+
+        const errorText =
+          await directResponse.text();
+
+        throw new Error(
+          `Direct ECMWF API error ${directResponse.status}: ${errorText}`
         );
-
-
-        console.log(
-          `Loaded ${data.forecast.length} meteorological forecast records.`
-        );
-
-
-      } catch (error) {
-
-        console.error(
-          "Meteorological forecast error:",
-          error
-        );
-
-
-        setMeteorologicalForecast([]);
-
-
-        setMeteorologicalError(
-          error.message ||
-          "Unable to load real meteorological forecast data."
-        );
-
-
-      } finally {
-
-        setMeteorologicalLoading(false);
 
       }
 
-    };
 
+      const directData =
+        await directResponse.json();
+
+
+      console.log(
+        "Direct ECMWF forecast response:",
+        directData
+      );
+
+
+      const daily =
+        directData.daily;
+
+
+      if (
+        !daily ||
+        !Array.isArray(daily.time)
+      ) {
+
+        throw new Error(
+          "Direct ECMWF response contains no daily forecast data."
+        );
+
+      }
+
+
+      if (
+        daily.time.length < 15
+      ) {
+
+        throw new Error(
+          `Direct ECMWF returned only ${daily.time.length} days instead of 15.`
+        );
+
+      }
+
+
+      const forecast =
+        daily.time
+          .slice(0, 15)
+          .map(
+            (date, index) => ({
+
+              day:
+                index + 1,
+
+              date,
+
+              rainfall:
+                Number(
+                  daily.rain_sum?.[index] ??
+                  0
+                ),
+
+              precipitation:
+                Number(
+                  daily.precipitation_sum?.[index] ??
+                  0
+                ),
+
+              temperature_max:
+                daily.temperature_2m_max?.[index] ??
+                null,
+
+              temperature_min:
+                daily.temperature_2m_min?.[index] ??
+                null,
+
+              precipitation_hours:
+                daily.precipitation_hours?.[index] ??
+                null,
+
+              source:
+                "ECMWF IFS",
+
+              provider:
+                "Open-Meteo",
+
+              data_type:
+                "Numerical Weather Prediction"
+
+            })
+          );
+
+
+      setMeteorologicalForecast(
+        forecast
+      );
+
+
+      console.log(
+        "15-day ECMWF forecast used directly from Open-Meteo:",
+        forecast
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "Meteorological forecast error:",
+        error
+      );
+
+      setMeteorologicalForecast([]);
+
+      setMeteorologicalError(
+        error.message ||
+        "Unable to load 15-day meteorological forecast data."
+      );
+
+    } finally {
+
+      setMeteorologicalLoading(false);
+
+    }
+
+  };
 
   // =========================================================
   // CURRENT METEOROLOGICAL DATA
