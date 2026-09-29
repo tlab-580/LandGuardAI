@@ -1311,3 +1311,684 @@ footer {
   display: inline-block !important;
   font-size: 16px !important;
 }
+/* =========================================================
+   LANDGUARD AI 2.0 - IMPACT ASSESSMENT
+   ========================================================= */
+
+.impact-assessment-card {
+  margin-top: 24px;
+}
+
+.impact-assessment-card .panel-header {
+  margin-bottom: 24px;
+}
+
+.impact-assessment-card .panel-header p {
+  max-width: 850px;
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+.impact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.impact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.7);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.impact-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.impact-icon {
+  font-size: 30px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.impact-item strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 7px;
+}
+
+.impact-item p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
+
+/* =========================================================
+   RESPONSIVE IMPACT ASSESSMENT
+   ========================================================= */
+
+@media (max-width: 1100px) {
+  .impact-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .impact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .impact-item {
+    padding: 16px;
+  }
+}
+
+.impact-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.impact-status strong {
+  font-size: 13px;
+  letter-spacing: 0.8px;
+}
+
+.impact-badge {
+  display: inline-block;
+  margin: 7px 0 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.impact-badge.high {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.impact-badge.moderate {
+  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+}
+
+.impact-badge.low {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.impact-badge.pending {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+}
+.impact-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.impact-status strong {
+  font-size: 13px;
+  letter-spacing: 0.8px;
+}
+
+.impact-badge {
+  display: inline-block;
+  margin: 7px 0 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.impact-badge.high {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.impact-badge.moderate {
+  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+}
+
+.impact-badge.low {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.impact-badge.pending {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+}
+
+/* ============================================================
+   7-DAY FORECAST PROBABILITY BREAKDOWN
+   ============================================================ */
+
+.forecast-probabilities {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.probability-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 7px;
+  font-size: 12px;
+}
+
+.probability-row strong {
+  font-weight: 700;
+}
+
+@media (max-width: 650px) {
+
+  .probability-row {
+    font-size: 11px;
+  }
+
+}
+
+
+/* ============================================================
+   MAIN AI RISK PROBABILITY BREAKDOWN
+   ============================================================ */
+
+.main-risk-probabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.main-probability-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+}
+
+.main-probability-item strong {
+  font-weight: 700;
+}
+
+@media (max-width: 650px) {
+
+  .main-risk-probabilities {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .main-probability-item {
+    width: fit-content;
+  }
+
+}
+
+/* =========================================================
+   REAL METEOROLOGICAL FORECAST
+   ========================================================= */
+
+.meteorological-panel {
+  margin-top: 24px;
+}
+
+.meteorological-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.meteorological-panel .panel-header p {
+  max-width: 850px;
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+.meteorological-source-badge {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(14, 116, 144, 0.1);
+  border: 1px solid rgba(14, 116, 144, 0.25);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.meteorological-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.meteorological-info span {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  font-size: 12px;
+}
+
+.meteorological-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.meteorological-card {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.75);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.meteorological-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.meteo-day {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.meteo-date {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.meteo-rainfall {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0;
+  font-size: 18px;
+}
+
+.meteo-rainfall strong {
+  font-size: 20px;
+}
+
+.meteo-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meteo-details div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.meteo-details span {
+  opacity: 0.7;
+}
+
+.meteo-details strong {
+  font-size: 12px;
+}
+
+.meteo-source {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+
+.meteorological-status {
+  padding: 20px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.meteorological-error {
+  padding: 16px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+@media (max-width: 1200px) {
+  .meteorological-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .meteorological-panel .panel-header {
+    flex-direction: column;
+  }
+
+  .meteorological-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 550px) {
+  .meteorological-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .meteorological-info {
+    flex-direction: column;
+  }
+}
+
+
+/* =========================================================
+   METEOROLOGICAL → AI FORECAST LINEAGE
+   ========================================================= */
+
+.forecast-lineage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  margin: 20px 0;
+
+  padding: 18px 20px;
+
+  border-radius: 14px;
+
+  border: 1px solid rgba(14, 116, 144, 0.2);
+
+  background: rgba(14, 116, 144, 0.04);
+}
+
+.lineage-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  min-width: 0;
+}
+
+.lineage-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.lineage-step strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.lineage-step small {
+  display: block;
+  margin-top: 3px;
+
+  font-size: 10px;
+  line-height: 1.4;
+
+  opacity: 0.6;
+}
+
+.lineage-arrow {
+  font-size: 22px;
+  font-weight: 700;
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+
+  .forecast-lineage {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .lineage-arrow {
+    display: none;
+  }
+
+  .lineage-step {
+    flex: 1 1 40%;
+    justify-content: center;
+  }
+
+}
+
+@media (max-width: 550px) {
+
+  .forecast-lineage {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .lineage-step {
+    justify-content: flex-start;
+  }
+
+}
+
+.current-weather-panel {
+  margin-top: 24px;
+}
+
+.current-weather-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.weather-card {
+  padding: 18px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(14, 116, 144, 0.18);
+  background: rgba(14, 116, 144, 0.04);
+  text-align: center;
+}
+
+.weather-card span {
+  display: block;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.weather-card small {
+  display: block;
+  font-size: 10px;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.weather-card strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 17px;
+}
+
+.weather-source {
+  margin-top: 16px;
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+.weather-loading,
+.weather-error {
+  padding: 18px;
+  margin-top: 16px;
+  border-radius: 12px;
+}
+
+.weather-loading {
+  background: rgba(14, 116, 144, 0.05);
+}
+
+.weather-error {
+  background: rgba(220, 38, 38, 0.06);
+}
+
+@media (max-width: 1000px) {
+  .current-weather-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .current-weather-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
+.satellite-metrics {
+  display: flex;
+  gap: 18px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.satellite-metrics div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.satellite-metrics span {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.satellite-metrics strong {
+  font-size: 1rem;
+}
+
+.error-text {
+  color: #dc2626;
+}
+
+/* =========================================
+   METEOROLOGICAL FORECAST
+   ========================================= */
+
+.meteorological-panel {
+  margin-top: 24px;
+}
+
+.meteorological-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.section-kicker {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+  opacity: 0.7;
+}
+
+.data-source-badge {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.meteorological-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(170px, 1fr)
+  );
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.meteorological-card {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.forecast-day {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.forecast-date {
+  font-size: 0.78rem;
+  opacity: 0.65;
+  margin-top: 3px;
+}
+
+.forecast-rain {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-top: 14px;
+}
+
+.forecast-temperature {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 0.82rem;
+}
+
+.forecast-hours {
+  margin-top: 10px;
+  font-size: 0.76rem;
+  opacity: 0.7;
+}
+
+.loading-state,
+.error-state {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.error-state {
+  color: #dc2626;
+}
+
+
