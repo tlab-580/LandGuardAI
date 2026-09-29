@@ -1,34 +1,38 @@
 import json
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 
 # ============================================================
-# OPEN-METEO CONFIGURATION
+# OPEN-METEO / NWP CONFIGURATION
 # ============================================================
 
-OPEN_METEO_BASE_URL = (
-    "https://api.open-meteo.com/v1/forecast"
-)
+ECMWF_API_URL = "https://api.open-meteo.com/v1/ecmwf"
+GFS_API_URL = "https://api.open-meteo.com/v1/gfs"
 
-# Keep recent successful responses in memory so repeated
-# dashboard requests do not repeatedly hit Open-Meteo.
+# Cache successful provider responses in memory so repeated
+# dashboard requests do not repeatedly hit the external API.
 FORECAST_CACHE_TTL_SECONDS = 15 * 60
 CURRENT_WEATHER_CACHE_TTL_SECONDS = 5 * 60
 
-# Short retry schedule for temporary HTTP 429 responses.
-# This avoids immediately failing on a transient rate limit.
-MAX_429_RETRIES = 3
-RETRY_DELAYS_SECONDS = [2, 4, 8]
+# Short retry schedule for transient HTTP 429 responses.
+MAX_429_RETRIES = 2
+RETRY_DELAYS_SECONDS = [2, 4]
 
-# Thread-safe cache because FastAPI may serve concurrent requests.
 _CACHE_LOCK = threading.Lock()
 
-# Cache key -> {"timestamp": float, "data": dict}
+# Cache key -> {
+#   "timestamp": float,
+#   "data": dict,
+#   "model": str,
+#   "provider": str,
+#   "source_url": str,
+# }
 _OPEN_METEO_CACHE = {}
 
 
@@ -37,21 +41,17 @@ _OPEN_METEO_CACHE = {}
 # ============================================================
 
 def _cache_key(latitude: float, longitude: float):
-    """Create a stable cache key for a geographic point."""
-
     return (
         round(float(latitude), 4),
         round(float(longitude), 4)
     )
 
 
-def _get_cached_open_meteo(
+def _get_cached_weather(
     latitude: float,
     longitude: float,
     ttl_seconds: int
 ):
-    """Return a recent cached Open-Meteo response, if available."""
-
     key = _cache_key(latitude, longitude)
 
     with _CACHE_LOCK:
@@ -65,88 +65,83 @@ def _get_cached_open_meteo(
         if age > ttl_seconds:
             return None
 
-        return cached["data"]
+        return cached
 
 
-def _store_cached_open_meteo(
+def _get_stale_cached_weather(
+    latitude: float,
+    longitude: float
+):
+    key = _cache_key(latitude, longitude)
+
+    with _CACHE_LOCK:
+        return _OPEN_METEO_CACHE.get(key)
+
+
+def _store_cached_weather(
     latitude: float,
     longitude: float,
-    data: dict
+    data: dict,
+    model: str,
+    source_url: str
 ):
-    """Store the latest successful Open-Meteo response."""
-
     key = _cache_key(latitude, longitude)
 
     with _CACHE_LOCK:
         _OPEN_METEO_CACHE[key] = {
             "timestamp": time.time(),
-            "data": data
+            "data": data,
+            "model": model,
+            "provider": "Open-Meteo",
+            "source_url": source_url,
         }
 
 
-def _get_stale_cached_open_meteo(
-    latitude: float,
-    longitude: float
-):
-    """Return the last successful response even when its TTL expired."""
-
-    key = _cache_key(latitude, longitude)
-
-    with _CACHE_LOCK:
-        cached = _OPEN_METEO_CACHE.get(key)
-
-        if not cached:
-            return None
-
-        return cached["data"]
-
-
 # ============================================================
-# OPEN-METEO REQUEST
+# REQUEST BUILDERS
 # ============================================================
 
-def _fetch_open_meteo_data(
+def _build_hourly_params(
     latitude: float,
     longitude: float,
-    days: int = 15
+    days: int
 ):
-    """
-    Fetch one combined Open-Meteo response containing:
-
-    - ECMWF IFS daily forecast fields
-    - current meteorological conditions
-
-    The combined response is cached and reused by both public
-    weather functions so the dashboard does not create duplicate
-    external requests.
-    """
-
-    params = {
+    return {
         "latitude": latitude,
         "longitude": longitude,
-        "daily": (
-            "rain_sum,"
-            "precipitation_sum,"
-            "temperature_2m_max,"
-            "temperature_2m_min,"
-            "precipitation_hours"
-        ),
-        "current": (
+        "hourly": (
             "temperature_2m,"
             "relative_humidity_2m,"
             "precipitation,"
             "rain,"
             "weather_code,"
             "wind_speed_10m,"
-            "soil_moisture_0_to_1cm"
+            "soil_moisture_0_to_10cm"
         ),
         "timezone": "auto",
         "forecast_days": days,
-        "models": "ecmwf_ifs025",
     }
 
+
+# ============================================================
+# NWP REQUEST
+# ============================================================
+
+def _request_model(
+    base_url: str,
+    model_name: str,
+    latitude: float,
+    longitude: float,
+    days: int
+):
+    params = _build_hourly_params(
+        latitude,
+        longitude,
+        days
+    )
+
     url = (
-        OPEN_METEO_BASE_URL
+        base_url
         + "?"
         + urlencode(params)
     )
@@ -173,22 +168,29 @@ def _fetch_open_meteo_data(
                     response.read().decode("utf-8")
                 )
 
-            _store_cached_open_meteo(
+            if not data.get("hourly"):
+                raise RuntimeError(
+                    f"{model_name} returned no hourly forecast data."
+                )
+
+            _store_cached_weather(
                 latitude=latitude,
                 longitude=longitude,
-                data=data
+                data=data,
+                model=model_name,
+                source_url=url
             )
 
-            return data
+            return data, model_name, False
 
         except HTTPError as error:
 
             last_error = error
 
-            # Rate limiting: retry briefly before falling back to
-            # the last successful cached response.
-            if error.code == 429 and attempt < MAX_429_RETRIES:
-
+            if (
+                error.code == 429
+                and attempt < MAX_429_RETRIES
+            ):
                 retry_after = error.headers.get(
                     "Retry-After"
                 )
@@ -206,23 +208,21 @@ def _fetch_open_meteo_data(
                         )
                     ]
 
-                # Prevent an unexpectedly large server-provided
-                # Retry-After value from blocking the API for too long.
-                delay = max(1, min(delay, 10))
-
+                # Do not allow an unexpectedly large server value
+                # to block the FastAPI request for a long time.
+                delay = max(1, min(delay, 8))
                 time.sleep(delay)
                 continue
 
             raise RuntimeError(
-                f"Meteorological API returned HTTP {error.code}"
+                f"{model_name} API returned HTTP {error.code}"
             )
 
         except URLError as error:
 
             last_error = error
-
             raise RuntimeError(
-                "Unable to connect to meteorological API: "
+                f"Unable to connect to {model_name} API: "
                 f"{error.reason}"
             )
 
@@ -232,15 +232,13 @@ def _fetch_open_meteo_data(
         ) as error:
 
             last_error = error
-
             raise RuntimeError(
-                "Meteorological API returned an invalid or "
-                "timed-out response."
+                f"{model_name} API returned an invalid or "
+                f"timed-out response: {error}"
             )
 
-    # Defensive fallback; the loop normally raises before this point.
     raise RuntimeError(
-        f"Meteorological API request failed: {last_error}"
+        f"{model_name} API request failed: {last_error}"
     )
 
 
@@ -251,14 +249,17 @@ def _get_weather_data(
     ttl_seconds: int
 ):
     """
-    Get weather data from the recent cache when possible.
+    Provider order:
 
-    When the external API is temporarily unavailable, the last
-    successful cached response is returned so the dashboard remains
-    usable instead of failing completely.
+    1. Recent successful cache
+    2. ECMWF IFS
+    3. NOAA GFS through Open-Meteo
+    4. Stale successful cache
+
+    The result records which NWP model actually supplied the data.
     """
 
-    cached = _get_cached_open_meteo(
+    cached = _get_cached_weather(
         latitude=latitude,
         longitude=longitude,
         ttl_seconds=ttl_seconds
@@ -267,31 +268,287 @@ def _get_weather_data(
     if cached is not None:
         return cached, False
 
-    try:
-        fresh_data = _fetch_open_meteo_data(
-            latitude=latitude,
-            longitude=longitude,
-            days=days
-        )
+    errors = []
 
-        return fresh_data, False
+    providers = [
+        (
+            ECMWF_API_URL,
+            "ECMWF IFS"
+        ),
+        (
+            GFS_API_URL,
+            "NOAA GFS"
+        ),
+    ]
 
-    except RuntimeError as error:
+    for base_url, model_name in providers:
 
-        stale = _get_stale_cached_open_meteo(
-            latitude=latitude,
-            longitude=longitude
-        )
+        try:
 
-        if stale is not None:
-            print(
-                "Open-Meteo temporarily unavailable; "
-                "using last successful cached response: "
-                f"{error}"
+            data, resolved_model, _ = _request_model(
+                base_url=base_url,
+                model_name=model_name,
+                latitude=latitude,
+                longitude=longitude,
+                days=days
             )
-            return stale, True
 
-        raise
+            cached_result = _get_stale_cached_weather(
+                latitude,
+                longitude
+            )
+
+            return cached_result, False
+
+        except RuntimeError as error:
+
+            errors.append(
+                f"{model_name}: {error}"
+            )
+
+    stale = _get_stale_cached_weather(
+        latitude,
+        longitude
+    )
+
+    if stale is not None:
+        print(
+            "NWP providers temporarily unavailable; "
+            "using last successful cached response. "
+            + " | ".join(errors)
+        )
+        return stale, True
+
+    raise RuntimeError(
+        "All configured NWP providers are currently unavailable. "
+        + " | ".join(errors)
+    )
+
+
+# ============================================================
+# HOURLY -> DAILY AGGREGATION
+# ============================================================
+
+def _aggregate_daily_forecast(data: dict):
+    hourly = data.get("hourly", {})
+    times = hourly.get("time", [])
+
+    temperature = hourly.get(
+        "temperature_2m", []
+    )
+    precipitation = hourly.get(
+        "precipitation", []
+    )
+    rain = hourly.get(
+        "rain", []
+    )
+
+    daily = {}
+
+    for i, timestamp in enumerate(times):
+
+        date = str(timestamp).split("T")[0]
+
+        entry = daily.setdefault(
+            date,
+            {
+                "rainfall": 0.0,
+                "precipitation": 0.0,
+                "temperatures": [],
+                "precipitation_hours": 0.0,
+            }
+        )
+
+        rain_value = (
+            rain[i]
+            if i < len(rain)
+            else None
+        )
+
+        precipitation_value = (
+            precipitation[i]
+            if i < len(precipitation)
+            else None
+        )
+
+        temperature_value = (
+            temperature[i]
+            if i < len(temperature)
+            else None
+        )
+
+        if rain_value is not None:
+            try:
+                rain_number = float(rain_value)
+                entry["rainfall"] += max(
+                    0.0,
+                    rain_number
+                )
+            except (TypeError, ValueError):
+                pass
+
+        if precipitation_value is not None:
+            try:
+                precipitation_number = float(
+                    precipitation_value
+                )
+                entry["precipitation"] += max(
+                    0.0,
+                    precipitation_number
+                )
+
+                if precipitation_number > 0:
+                    # Open-Meteo hourly series can become coarser
+                    # farther into the forecast. We preserve a
+                    # conservative sample-hour count here.
+                    entry["precipitation_hours"] += 1.0
+
+            except (TypeError, ValueError):
+                pass
+
+        if temperature_value is not None:
+            try:
+                entry["temperatures"].append(
+                    float(temperature_value)
+                )
+            except (TypeError, ValueError):
+                pass
+
+    forecast = []
+
+    for day_number, (date, values) in enumerate(
+        daily.items(),
+        start=1
+    ):
+
+        temperatures = values["temperatures"]
+
+        forecast.append({
+            "day": day_number,
+            "date": date,
+            "rainfall": round(
+                values["rainfall"],
+                2
+            ),
+            "precipitation": round(
+                values["precipitation"],
+                2
+            ),
+            "temperature_max": (
+                round(
+                    max(temperatures),
+                    1
+                )
+                if temperatures
+                else None
+            ),
+            "temperature_min": (
+                round(
+                    min(temperatures),
+                    1
+                )
+                if temperatures
+                else None
+            ),
+            "precipitation_hours": round(
+                values["precipitation_hours"],
+                1
+            ),
+        })
+
+    return forecast
+
+
+# ============================================================
+# CURRENT HOURLY CONDITIONS
+# ============================================================
+
+def _extract_current_conditions(data: dict):
+    hourly = data.get("hourly", {})
+    times = hourly.get("time", [])
+
+    if not times:
+        raise RuntimeError(
+            "NWP response returned no hourly time values."
+        )
+
+    timezone_name = data.get(
+        "timezone",
+        "UTC"
+    )
+
+    try:
+        local_now = datetime.now(
+            ZoneInfo(timezone_name)
+        )
+    except Exception:
+        local_now = datetime.now()
+
+    target_date = local_now.strftime(
+        "%Y-%m-%d"
+    )
+    target_hour = local_now.strftime(
+        "%Y-%m-%dT%H:00"
+    )
+
+    best_index = None
+
+    for i, timestamp in enumerate(times):
+        if str(timestamp).startswith(target_hour):
+            best_index = i
+            break
+
+    if best_index is None:
+        # Fall back to the latest forecast timestamp that is not
+        # later than the current local hour.
+        try:
+            parsed_times = [
+                datetime.fromisoformat(
+                    str(timestamp).replace("Z", "")
+                )
+                for timestamp in times
+            ]
+            naive_now = local_now.replace(tzinfo=None)
+
+            candidates = [
+                (i, item_time)
+                for i, item_time in enumerate(parsed_times)
+                if item_time <= naive_now
+            ]
+
+            if candidates:
+                best_index = max(
+                    candidates,
+                    key=lambda item: item[1]
+                )[0]
+            else:
+                best_index = 0
+
+        except (TypeError, ValueError):
+            best_index = 0
+
+    def value(name, default=None):
+        values = hourly.get(name, [])
+        if best_index >= len(values):
+            return default
+        return values[best_index]
+
+    return {
+        "time": times[best_index],
+        "temperature": value("temperature_2m"),
+        "relative_humidity": value(
+            "relative_humidity_2m"
+        ),
+        "precipitation": value(
+            "precipitation"
+        ),
+        "rainfall": value("rain"),
+        "weather_code": value("weather_code"),
+        "wind_speed": value("wind_speed_10m"),
+        "soil_moisture": value(
+            "soil_moisture_0_to_10cm"
+        ),
+    }
 
 
 # ============================================================
@@ -304,21 +561,16 @@ def generate_meteorological_forecast(
     days: int = 15
 ):
     """
-    Fetches real numerical weather prediction data.
+    Returns real NWP rainfall/weather forecast data.
 
-    Data source:
-    Open-Meteo ECMWF IFS forecast
+    Primary model:
+        ECMWF IFS
 
-    This is real meteorological forecast data from an NWP model,
-    not a synthetic rainfall scenario.
+    Fallback model:
+        NOAA GFS through Open-Meteo
 
-    ECMWF IFS forecast availability is limited to approximately
-    15 days through the selected API.
-
-    Production safeguards:
-    - in-memory caching
-    - short retry for HTTP 429
-    - stale-cache fallback during temporary API failures
+    The returned payload explicitly identifies the model that
+    supplied the data. No synthetic rainfall values are created.
     """
 
     if days < 1 or days > 15:
@@ -326,120 +578,56 @@ def generate_meteorological_forecast(
             "Real meteorological forecast supports 1 to 15 days."
         )
 
-    data, used_stale_cache = _get_weather_data(
+    cached, used_stale_cache = _get_weather_data(
         latitude=latitude,
         longitude=longitude,
         days=days,
         ttl_seconds=FORECAST_CACHE_TTL_SECONDS
     )
 
-    daily = data.get("daily")
+    data = cached["data"]
+    model = cached["model"]
+    provider = cached["provider"]
 
-    if not daily:
-        raise RuntimeError(
-            "Meteorological API returned no daily forecast data."
-        )
-
-    dates = daily.get("time", [])
-    rain = daily.get("rain_sum", [])
-    precipitation = daily.get("precipitation_sum", [])
-    temp_max = daily.get("temperature_2m_max", [])
-    temp_min = daily.get("temperature_2m_min", [])
-    precipitation_hours = daily.get(
-        "precipitation_hours", []
-    )
-
-    forecast = []
-
-    for i, date in enumerate(dates):
-
-        # Protect against partially populated API arrays.
-        rain_value = (
-            rain[i]
-            if i < len(rain)
-            else 0
-        )
-
-        precipitation_value = (
-            precipitation[i]
-            if i < len(precipitation)
-            else 0
-        )
-
-        temp_max_value = (
-            temp_max[i]
-            if i < len(temp_max)
-            else None
-        )
-
-        temp_min_value = (
-            temp_min[i]
-            if i < len(temp_min)
-            else None
-        )
-
-        precipitation_hours_value = (
-            precipitation_hours[i]
-            if i < len(precipitation_hours)
-            else 0
-        )
-
-        forecast.append({
-            "day": i + 1,
-            "date": date,
-
-            "rainfall": round(
-                float(rain_value or 0), 2
-            ),
-
-            "precipitation": round(
-                float(precipitation_value or 0), 2
-            ),
-
-            "temperature_max": round(
-                float(temp_max_value), 1
-            ) if temp_max_value is not None else None,
-
-            "temperature_min": round(
-                float(temp_min_value), 1
-            ) if temp_min_value is not None else None,
-
-            "precipitation_hours": round(
-                float(precipitation_hours_value or 0), 1
-            ),
-
-            "source": "ECMWF IFS",
-            "provider": "Open-Meteo",
-            "data_type": "Numerical Weather Prediction"
-        })
+    forecast = _aggregate_daily_forecast(
+        data
+    )[:days]
 
     result = {
         "location": {
             "latitude": latitude,
             "longitude": longitude
         },
-        "model": "ECMWF IFS",
-        "provider": "Open-Meteo",
-        "forecast_days": days,
+        "model": model,
+        "provider": provider,
+        "forecast_days": len(forecast),
         "data_type": "Numerical Weather Prediction",
-        "forecast": forecast
+        "forecast": [],
     }
 
+    for item in forecast:
+        result["forecast"].append({
+            **item,
+            "source": model,
+            "provider": provider,
+            "data_type": "Numerical Weather Prediction"
+        })
+
     if used_stale_cache:
+        result["live"] = False
         result["cache_status"] = (
             "stale_cache_used_due_to_temporary_api_unavailability"
         )
-        result["live"] = False
     else:
-        result["cache_status"] = "fresh_or_recent_cached_data"
         result["live"] = True
+        result["cache_status"] = "fresh_or_recent_cached_data"
 
     return result
 
 
-# ---------------------------------------------------------
+# ============================================================
 # EXISTING SCENARIO GENERATOR
-# ---------------------------------------------------------
+# ============================================================
 
 def generate_rainfall_scenario(
     base_rainfall: float,
@@ -470,7 +658,6 @@ def generate_rainfall_scenario(
     from datetime import datetime, timedelta
 
     today = datetime.now()
-
     forecast = []
 
     for i in range(days):
@@ -496,87 +683,66 @@ def generate_rainfall_scenario(
     return forecast
 
 
+# ============================================================
+# CURRENT METEOROLOGICAL DATA
+# ============================================================
+
 def generate_current_weather(
     latitude: float,
     longitude: float
 ):
     """
-    Retrieves current weather conditions for the selected location.
+    Returns current meteorological conditions from the same NWP
+    data pipeline used by the forecast endpoint.
 
-    IMPORTANT:
-    These values are current meteorological data from Open-Meteo.
-    They should not be described as direct ground-station observations.
-
-    Production safeguards:
-    - shared cache with the forecast endpoint
-    - short retry for HTTP 429
-    - stale-cache fallback during temporary API failures
+    Provider/model are reported explicitly, and the stale-cache
+    state is exposed when upstream services are temporarily down.
     """
 
-    data, used_stale_cache = _get_weather_data(
+    cached, used_stale_cache = _get_weather_data(
         latitude=latitude,
         longitude=longitude,
         days=15,
         ttl_seconds=CURRENT_WEATHER_CACHE_TTL_SECONDS
     )
 
-    current = data.get("current")
+    data = cached["data"]
+    model = cached["model"]
+    provider = cached["provider"]
 
-    if not current:
-        raise RuntimeError(
-            "Current weather API returned no current data."
-        )
+    current = _extract_current_conditions(
+        data
+    )
 
     result = {
         "location": {
             "latitude": latitude,
             "longitude": longitude
         },
-
-        "time": current.get("time"),
-
-        "temperature": current.get(
-            "temperature_2m"
-        ),
-
-        "relative_humidity": current.get(
-            "relative_humidity_2m"
-        ),
-
-        "precipitation": current.get(
+        "time": current["time"],
+        "temperature": current["temperature"],
+        "relative_humidity": current[
+            "relative_humidity"
+        ],
+        "precipitation": current[
             "precipitation"
-        ),
-
-        "rainfall": current.get(
-            "rain"
-        ),
-
-        "weather_code": current.get(
-            "weather_code"
-        ),
-
-        "wind_speed": current.get(
-            "wind_speed_10m"
-        ),
-
-        "soil_moisture": current.get(
-            "soil_moisture_0_to_1cm"
-        ),
-
-        "provider": "Open-Meteo",
-
-        "data_type": (
-            "Current meteorological data"
-        )
+        ],
+        "rainfall": current["rainfall"],
+        "weather_code": current["weather_code"],
+        "wind_speed": current["wind_speed"],
+        "soil_moisture": current["soil_moisture"],
+        "provider": provider,
+        "model": model,
+        "data_type": "Current meteorological data"
     }
 
     if used_stale_cache:
+        result["live"] = False
         result["cache_status"] = (
             "stale_cache_used_due_to_temporary_api_unavailability"
         )
-        result["live"] = False
     else:
-        result["cache_status"] = "fresh_or_recent_cached_data"
         result["live"] = True
+        result["cache_status"] = "fresh_or_recent_cached_data"
 
     return result
