@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 
 import {
@@ -70,10 +69,12 @@ function App() {
 
   const [meteorologicalForecast, setMeteorologicalForecast] =
     useState([]);
+
   const meteorologicalSource =
-  meteorologicalForecast?.[0]?.source ||
-  meteorologicalForecast?.[0]?.provider ||
-  "NWP";
+    meteorologicalForecast?.[0]?.source ||
+    meteorologicalForecast?.[0]?.provider ||
+    "NWP";
+
 
   const [currentWeather, setCurrentWeather] =
     useState(null);
@@ -222,806 +223,925 @@ function App() {
   // =========================================================
   // REAL METEOROLOGICAL FORECAST
   // =========================================================
-  // =========================================================
-// REAL METEOROLOGICAL FORECAST
-// =========================================================
 
-const fetchMeteorologicalForecast =
-  async () => {
+  const fetchMeteorologicalForecast =
+    async () => {
 
-    setMeteorologicalLoading(true);
-    setMeteorologicalError("");
+      setMeteorologicalLoading(true);
+      setMeteorologicalError("");
 
-    try {
+      try {
 
-      const latitude = 26.1445;
-      const longitude = 91.7362;
+        const latitude = 26.1445;
+        const longitude = 91.7362;
 
-      const apiUrl =
-        import.meta.env.VITE_API_URL;
+        const apiUrl =
+          import.meta.env.VITE_API_URL;
 
 
-      // =====================================================
-      // 1. TRY LANDGUARD BACKEND FIRST
-      // =====================================================
+        // =====================================================
+        // 1. TRY LANDGUARD BACKEND FIRST
+        // =====================================================
 
-      if (apiUrl) {
+        if (apiUrl) {
 
-        const backendUrl =
-          `${apiUrl}/meteorological-forecast` +
-          `?latitude=${latitude}` +
-          `&longitude=${longitude}` +
-          `&days=15`;
-
-        console.log(
-          "Fetching meteorological forecast:",
-          backendUrl
-        );
-
-        try {
-
-          const backendResponse =
-            await fetch(backendUrl);
+          const backendUrl =
+            `${apiUrl}/meteorological-forecast` +
+            `?latitude=${latitude}` +
+            `&longitude=${longitude}` +
+            `&days=15`;
 
           console.log(
-            "Meteorological backend response status:",
-            backendResponse.status
+            "Fetching meteorological forecast:",
+            backendUrl
           );
 
-          if (backendResponse.ok) {
 
-            const backendData =
-              await backendResponse.json();
+          try {
+
+            const backendResponse =
+              await fetch(backendUrl);
+
 
             console.log(
-              "Meteorological backend response:",
-              backendData
+              "Meteorological backend response status:",
+              backendResponse.status
             );
 
-            if (
-              backendData.status === "success" &&
-              Array.isArray(backendData.forecast) &&
-              backendData.forecast.length >= 15
-            ) {
 
-              setMeteorologicalForecast(
-                backendData.forecast.slice(0, 15)
-              );
+            if (backendResponse.ok) {
+
+              const backendData =
+                await backendResponse.json();
+
 
               console.log(
-                "15-day forecast supplied by LandGuard backend:",
-                backendData.source
+                "Meteorological backend response:",
+                backendData
               );
 
-              return;
+
+              if (
+                backendData.status === "success" &&
+                Array.isArray(backendData.forecast) &&
+                backendData.forecast.length >= 15
+              ) {
+
+                const backendForecast =
+                  backendData.forecast.slice(0, 15);
+
+
+                // =============================================
+                // VALIDATE BACKEND TEMPERATURE DATA
+                // =============================================
+
+                const backendTemperatureValid =
+                  backendForecast.every(
+                    (day) => {
+
+                      const max =
+                        day?.temperature_max;
+
+                      const min =
+                        day?.temperature_min;
+
+
+                      if (
+                        max == null ||
+                        min == null
+                      ) {
+
+                        return false;
+
+                      }
+
+
+                      const maxNumber =
+                        Number(max);
+
+                      const minNumber =
+                        Number(min);
+
+
+                      if (
+                        !Number.isFinite(maxNumber) ||
+                        !Number.isFinite(minNumber)
+                      ) {
+
+                        return false;
+
+                      }
+
+
+                      // A simultaneous 0/0 pair is treated
+                      // as an invalid missing-temperature
+                      // placeholder, not real Guwahati data.
+
+                      if (
+                        maxNumber === 0 &&
+                        minNumber === 0
+                      ) {
+
+                        return false;
+
+                      }
+
+
+                      return true;
+
+                    }
+                  );
+
+
+                // =============================================
+                // ACCEPT BACKEND ONLY WHEN TEMPERATURE DATA
+                // IS COMPLETE AND VALID
+                // =============================================
+
+                if (
+                  backendTemperatureValid
+                ) {
+
+                  setMeteorologicalForecast(
+                    backendForecast
+                  );
+
+
+                  console.log(
+                    "15-day forecast supplied by LandGuard backend:",
+                    backendData.source
+                  );
+
+
+                  return;
+
+                }
+
+
+                console.warn(
+                  "Backend returned 15 days, but one or more temperature values are invalid. " +
+                  "Fetching the direct ECMWF forecast from Open-Meteo."
+                );
+
+              } else {
+
+                console.warn(
+                  `Backend returned only ${
+                    backendData.forecast?.length ?? 0
+                  } valid forecast days. ` +
+                  "Fetching 15-day ECMWF forecast directly from Open-Meteo."
+                );
+
+              }
+
+            } else {
+
+              console.warn(
+                `LandGuard meteorological backend returned HTTP ${backendResponse.status}. ` +
+                "Using direct ECMWF Open-Meteo fallback."
+              );
+
             }
 
+          } catch (backendError) {
+
             console.warn(
-              `Backend returned only ${
-                backendData.forecast?.length ?? 0
-              } days. Fetching 15-day ECMWF forecast directly from Open-Meteo.`
+              "LandGuard meteorological backend unavailable:",
+              backendError
             );
 
           }
 
-        } catch (backendError) {
+        }
 
-          console.warn(
-            "LandGuard meteorological backend unavailable:",
-            backendError
+
+        // =====================================================
+        // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
+        //
+        // Generic Forecast API + explicit ECMWF IFS model.
+        //
+        // Hourly temperature is requested as a fallback for
+        // incomplete daily temperature values.
+        // =====================================================
+
+        const directParams =
+          new URLSearchParams({
+
+            latitude:
+              String(latitude),
+
+            longitude:
+              String(longitude),
+
+            models:
+              "ecmwf_ifs",
+
+            daily:
+              "rain_sum," +
+              "precipitation_sum," +
+              "temperature_2m_max," +
+              "temperature_2m_min," +
+              "precipitation_hours",
+
+            hourly:
+              "temperature_2m",
+
+            timezone:
+              "auto",
+
+            forecast_days:
+              "15",
+
+            temperature_unit:
+              "celsius"
+
+          });
+
+
+        const directUrl =
+          "https://api.open-meteo.com/v1/forecast?" +
+          directParams.toString();
+
+
+        console.log(
+          "Fetching direct 15-day ECMWF forecast:",
+          directUrl
+        );
+
+
+        const directResponse =
+          await fetch(directUrl);
+
+
+        console.log(
+          "Direct ECMWF response status:",
+          directResponse.status
+        );
+
+
+        if (!directResponse.ok) {
+
+          const errorText =
+            await directResponse.text();
+
+
+          throw new Error(
+            `Direct ECMWF API error ${directResponse.status}: ${errorText}`
           );
 
         }
 
-      }
+
+        const directData =
+          await directResponse.json();
 
 
-      // =====================================================
-      // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
-      //
-      // Generic Forecast API + explicit ECMWF IFS model.
-      //
-      // Hourly temperature is requested as a fallback for
-      // incomplete daily temperature values near the end
-      // of the forecast horizon.
-      // =====================================================
-
-      const directParams =
-        new URLSearchParams({
-
-          latitude:
-            String(latitude),
-
-          longitude:
-            String(longitude),
-
-          models:
-            "ecmwf_ifs",
-
-          daily:
-            "rain_sum," +
-            "precipitation_sum," +
-            "temperature_2m_max," +
-            "temperature_2m_min," +
-            "precipitation_hours",
-
-          hourly:
-            "temperature_2m",
-
-          timezone:
-            "auto",
-
-          forecast_days:
-            "15",
-
-          temperature_unit:
-            "celsius"
-
-        });
-
-
-      const directUrl =
-        "https://api.open-meteo.com/v1/forecast?" +
-        directParams.toString();
-
-
-      console.log(
-        "Fetching direct 15-day ECMWF forecast:",
-        directUrl
-      );
-
-
-      const directResponse =
-        await fetch(directUrl);
-
-
-      console.log(
-        "Direct ECMWF response status:",
-        directResponse.status
-      );
-
-
-      if (!directResponse.ok) {
-
-        const errorText =
-          await directResponse.text();
-
-        throw new Error(
-          `Direct ECMWF API error ${directResponse.status}: ${errorText}`
+        console.log(
+          "Direct ECMWF forecast response:",
+          directData
         );
 
-      }
 
-
-      const directData =
-        await directResponse.json();
-
-
-      console.log(
-        "Direct ECMWF forecast response:",
-        directData
-      );
-
-
-      const daily =
-        directData.daily;
-
-
-      if (
-        !daily ||
-        !Array.isArray(daily.time)
-      ) {
-
-        throw new Error(
-          "Direct ECMWF response contains no daily forecast data."
-        );
-
-      }
-
-
-      if (
-        daily.time.length < 15
-      ) {
-
-        throw new Error(
-          `Direct ECMWF returned only ${daily.time.length} days instead of 15.`
-        );
-
-      }
-
-
-      // =====================================================
-      // BUILD HOURLY TEMPERATURE FALLBACK
-      // =====================================================
-
-      const hourly =
-        directData.hourly || {};
-
-      const hourlyTimes =
-        Array.isArray(hourly.time)
-          ? hourly.time
-          : [];
-
-      const hourlyTemperatures =
-        Array.isArray(hourly.temperature_2m)
-          ? hourly.temperature_2m
-          : [];
-
-
-      const hourlyTemperatureByDate = {};
-
-
-      for (
-        let index = 0;
-        index < hourlyTimes.length;
-        index++
-      ) {
-
-        const timeValue =
-          hourlyTimes[index];
-
-        const temperatureValue =
-          hourlyTemperatures[index];
+        const daily =
+          directData.daily;
 
 
         if (
-          timeValue == null ||
-          temperatureValue == null
-        ) {
-          continue;
-        }
-
-
-        const numericTemperature =
-          Number(temperatureValue);
-
-
-        if (
-          !Number.isFinite(numericTemperature)
-        ) {
-          continue;
-        }
-
-
-        const dateKey =
-          String(timeValue).split("T")[0];
-
-
-        if (
-          !hourlyTemperatureByDate[dateKey]
+          !daily ||
+          !Array.isArray(daily.time)
         ) {
 
-          hourlyTemperatureByDate[dateKey] =
-            [];
-
-        }
-
-
-        hourlyTemperatureByDate[dateKey].push(
-          numericTemperature
-        );
-
-      }
-
-
-      // =====================================================
-      // CREATE 15-DAY INTERNAL FORECAST
-      // =====================================================
-
-      const forecast =
-        daily.time
-          .slice(0, 15)
-          .map(
-            (date, index) => {
-
-              const dailyMaxValue =
-                daily.temperature_2m_max?.[index];
-
-              const dailyMinValue =
-                daily.temperature_2m_min?.[index];
-
-
-              const dailyMax =
-                Number(dailyMaxValue);
-
-              const dailyMin =
-                Number(dailyMinValue);
-
-
-              const hourlyValues =
-                hourlyTemperatureByDate[date] ||
-                [];
-
-
-              // ------------------------------------------------
-              // DAILY TEMPERATURE
-              // ------------------------------------------------
-
-              let temperatureMax =
-                Number.isFinite(dailyMax)
-                  ? dailyMax
-                  : null;
-
-
-              let temperatureMin =
-                Number.isFinite(dailyMin)
-                  ? dailyMin
-                  : null;
-
-
-              // ------------------------------------------------
-              // HOURLY FALLBACK
-              // ------------------------------------------------
-
-              if (
-                temperatureMax == null &&
-                hourlyValues.length > 0
-              ) {
-
-                temperatureMax =
-                  Math.max(
-                    ...hourlyValues
-                  );
-
-              }
-
-
-              if (
-                temperatureMin == null &&
-                hourlyValues.length > 0
-              ) {
-
-                temperatureMin =
-                  Math.min(
-                    ...hourlyValues
-                  );
-
-              }
-
-
-              return {
-
-                day:
-                  index + 1,
-
-                date,
-
-                rainfall:
-                  Number(
-                    daily.rain_sum?.[index] ??
-                    0
-                  ),
-
-                precipitation:
-                  Number(
-                    daily.precipitation_sum?.[index] ??
-                    0
-                  ),
-
-                temperature_max:
-                  temperatureMax,
-
-                temperature_min:
-                  temperatureMin,
-
-                precipitation_hours:
-                  daily.precipitation_hours?.[index] ??
-                  null,
-
-                source:
-                  "ECMWF IFS",
-
-                provider:
-                  "Open-Meteo",
-
-                data_type:
-                  "Numerical Weather Prediction",
-
-                temperature_fallback_used:
-                  !Number.isFinite(dailyMax) ||
-                  !Number.isFinite(dailyMin)
-
-              };
-
-            }
+          throw new Error(
+            "Direct ECMWF response contains no daily forecast data."
           );
 
+        }
 
-      // =====================================================
-      // VALIDATE 15-DAY RESULT
-      // =====================================================
 
-      if (
-        forecast.length < 15
-      ) {
+        if (
+          daily.time.length < 15
+        ) {
 
-        throw new Error(
-          `Only ${forecast.length} forecast days could be prepared.`
+          throw new Error(
+            `Direct ECMWF returned only ${daily.time.length} days instead of 15.`
+          );
+
+        }
+
+
+        // =====================================================
+        // BUILD HOURLY TEMPERATURE LOOKUP
+        // =====================================================
+
+        const hourly =
+          directData.hourly || {};
+
+
+        const hourlyTimes =
+          Array.isArray(hourly.time)
+            ? hourly.time
+            : [];
+
+
+        const hourlyTemperatures =
+          Array.isArray(hourly.temperature_2m)
+            ? hourly.temperature_2m
+            : [];
+
+
+        const hourlyTemperatureByDate =
+          {};
+
+
+        for (
+          let index = 0;
+          index < hourlyTimes.length;
+          index++
+        ) {
+
+          const timeValue =
+            hourlyTimes[index];
+
+          const temperatureValue =
+            hourlyTemperatures[index];
+
+
+          if (
+            timeValue == null ||
+            temperatureValue == null
+          ) {
+
+            continue;
+
+          }
+
+
+          const numericTemperature =
+            Number(temperatureValue);
+
+
+          if (
+            !Number.isFinite(numericTemperature)
+          ) {
+
+            continue;
+
+          }
+
+
+          const dateKey =
+            String(timeValue).split("T")[0];
+
+
+          if (
+            !hourlyTemperatureByDate[dateKey]
+          ) {
+
+            hourlyTemperatureByDate[dateKey] =
+              [];
+
+          }
+
+
+          hourlyTemperatureByDate[dateKey].push(
+            numericTemperature
+          );
+
+        }
+
+
+        // =====================================================
+        // CREATE 15-DAY INTERNAL FORECAST
+        // =====================================================
+
+        const forecast =
+          daily.time
+            .slice(0, 15)
+            .map(
+              (date, index) => {
+
+                const dailyMaxValue =
+                  daily.temperature_2m_max?.[index];
+
+
+                const dailyMinValue =
+                  daily.temperature_2m_min?.[index];
+
+
+                // IMPORTANT:
+                // Do not use Number(null), because
+                // Number(null) becomes 0.
+
+                let dailyMax =
+                  dailyMaxValue == null
+                    ? null
+                    : Number(dailyMaxValue);
+
+
+                let dailyMin =
+                  dailyMinValue == null
+                    ? null
+                    : Number(dailyMinValue);
+
+
+                // Treat a simultaneous 0/0 pair as an
+                // invalid placeholder.
+
+                if (
+                  dailyMax === 0 &&
+                  dailyMin === 0
+                ) {
+
+                  dailyMax = null;
+                  dailyMin = null;
+
+                }
+
+
+                const hourlyValues =
+                  hourlyTemperatureByDate[date] ||
+                  [];
+
+
+                // ===========================================
+                // DAILY TEMPERATURE
+                // ===========================================
+
+                let temperatureMax =
+                  Number.isFinite(dailyMax)
+                    ? dailyMax
+                    : null;
+
+
+                let temperatureMin =
+                  Number.isFinite(dailyMin)
+                    ? dailyMin
+                    : null;
+
+
+                // ===========================================
+                // HOURLY FALLBACK FOR MAX
+                // ===========================================
+
+                if (
+                  temperatureMax == null &&
+                  hourlyValues.length > 0
+                ) {
+
+                  temperatureMax =
+                    Math.max(
+                      ...hourlyValues
+                    );
+
+                }
+
+
+                // ===========================================
+                // HOURLY FALLBACK FOR MIN
+                // ===========================================
+
+                if (
+                  temperatureMin == null &&
+                  hourlyValues.length > 0
+                ) {
+
+                  temperatureMin =
+                    Math.min(
+                      ...hourlyValues
+                    );
+
+                }
+
+
+                return {
+
+                  day:
+                    index + 1,
+
+                  date,
+
+                  rainfall:
+                    Number(
+                      daily.rain_sum?.[index] ??
+                      0
+                    ),
+
+                  precipitation:
+                    Number(
+                      daily.precipitation_sum?.[index] ??
+                      0
+                    ),
+
+                  temperature_max:
+                    temperatureMax,
+
+                  temperature_min:
+                    temperatureMin,
+
+                  precipitation_hours:
+                    daily.precipitation_hours?.[index] ??
+                    null,
+
+                  source:
+                    "ECMWF IFS",
+
+                  provider:
+                    "Open-Meteo",
+
+                  data_type:
+                    "Numerical Weather Prediction",
+
+                  temperature_fallback_used:
+                    !Number.isFinite(dailyMax) ||
+                    !Number.isFinite(dailyMin)
+
+                };
+
+              }
+            );
+
+
+        // =====================================================
+        // VALIDATE FINAL FORECAST
+        // =====================================================
+
+        if (
+          forecast.length < 15
+        ) {
+
+          throw new Error(
+            `Only ${forecast.length} forecast days could be prepared.`
+          );
+
+        }
+
+
+        setMeteorologicalForecast(
+          forecast
         );
+
+
+        console.log(
+          "15-day ECMWF forecast used directly from Open-Meteo:",
+          forecast
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "Meteorological forecast error:",
+          error
+        );
+
+
+        setMeteorologicalForecast([]);
+
+
+        setMeteorologicalError(
+          error.message ||
+          "Unable to load 15-day meteorological forecast data."
+        );
+
+      } finally {
+
+        setMeteorologicalLoading(false);
 
       }
 
+    };
 
-      setMeteorologicalForecast(
-        forecast
-      );
-
-
-      console.log(
-        "15-day ECMWF forecast used directly from Open-Meteo:",
-        forecast
-      );
-
-
-    } catch (error) {
-
-      console.error(
-        "Meteorological forecast error:",
-        error
-      );
-
-      setMeteorologicalForecast([]);
-
-      setMeteorologicalError(
-        error.message ||
-        "Unable to load 15-day meteorological forecast data."
-      );
-
-    } finally {
-
-      setMeteorologicalLoading(false);
-
-    }
-
-  };
 
   // =========================================================
   // CURRENT METEOROLOGICAL DATA
   // =========================================================
 
-  // =========================================================
-// CURRENT METEOROLOGICAL DATA
-// =========================================================
+  const fetchCurrentWeather =
+    async () => {
 
-const fetchCurrentWeather =
-  async () => {
-
-    setCurrentWeatherLoading(true);
-    setCurrentWeatherError("");
+      setCurrentWeatherLoading(true);
+      setCurrentWeatherError("");
 
 
-    try {
+      try {
 
-      const latitude = 26.1445;
-      const longitude = 91.7362;
+        const latitude = 26.1445;
+        const longitude = 91.7362;
 
-      const apiUrl =
-        import.meta.env.VITE_API_URL;
-
-
-      // =====================================================
-      // 1. TRY LANDGUARD BACKEND FIRST
-      // =====================================================
-
-      if (apiUrl) {
-
-        const backendUrl =
-          `${apiUrl}/current-weather` +
-          `?latitude=${latitude}` +
-          `&longitude=${longitude}`;
+        const apiUrl =
+          import.meta.env.VITE_API_URL;
 
 
-        console.log(
-          "Fetching current weather from LandGuard backend:",
-          backendUrl
-        );
+        // =====================================================
+        // 1. TRY LANDGUARD BACKEND FIRST
+        // =====================================================
 
+        if (apiUrl) {
 
-        try {
-
-          const backendResponse =
-            await fetch(backendUrl);
+          const backendUrl =
+            `${apiUrl}/current-weather` +
+            `?latitude=${latitude}` +
+            `&longitude=${longitude}`;
 
 
           console.log(
-            "Current weather backend response status:",
-            backendResponse.status
+            "Fetching current weather from LandGuard backend:",
+            backendUrl
           );
 
 
-          if (backendResponse.ok) {
+          try {
 
-            const backendData =
-              await backendResponse.json();
+            const backendResponse =
+              await fetch(backendUrl);
 
 
             console.log(
-              "Current meteorological data from backend:",
-              backendData
+              "Current weather backend response status:",
+              backendResponse.status
             );
 
 
-            if (
-              backendData.status === "success" &&
-              backendData.temperature != null
-            ) {
+            if (backendResponse.ok) {
 
-              setCurrentWeather(
+              const backendData =
+                await backendResponse.json();
+
+
+              console.log(
+                "Current meteorological data from backend:",
                 backendData
               );
 
-              return;
+
+              if (
+                backendData.status === "success" &&
+                backendData.temperature != null
+              ) {
+
+                setCurrentWeather(
+                  backendData
+                );
+
+                return;
+
+              }
 
             }
 
+          } catch (backendError) {
+
+            console.warn(
+              "LandGuard current-weather backend unavailable:",
+              backendError
+            );
+
           }
 
-        } catch (backendError) {
+        }
 
-          console.warn(
-            "LandGuard current-weather backend unavailable:",
-            backendError
+
+        // =====================================================
+        // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
+        // =====================================================
+
+        const directParams =
+          new URLSearchParams({
+
+            latitude:
+              String(latitude),
+
+            longitude:
+              String(longitude),
+
+            models:
+              "ecmwf_ifs",
+
+            current:
+              "temperature_2m," +
+              "relative_humidity_2m," +
+              "precipitation," +
+              "rain," +
+              "weather_code," +
+              "wind_speed_10m",
+
+            hourly:
+              "soil_moisture_0_to_7cm",
+
+            timezone:
+              "auto",
+
+            temperature_unit:
+              "celsius",
+
+            wind_speed_unit:
+              "kmh"
+
+          });
+
+
+        const directUrl =
+          "https://api.open-meteo.com/v1/forecast?" +
+          directParams.toString();
+
+
+        console.log(
+          "Fetching direct ECMWF current weather:",
+          directUrl
+        );
+
+
+        const directResponse =
+          await fetch(directUrl);
+
+
+        console.log(
+          "Direct ECMWF current-weather response status:",
+          directResponse.status
+        );
+
+
+        if (!directResponse.ok) {
+
+          const errorText =
+            await directResponse.text();
+
+
+          throw new Error(
+            `Direct ECMWF current-weather API error ` +
+            `${directResponse.status}: ${errorText}`
           );
 
         }
 
-      }
+
+        const directData =
+          await directResponse.json();
 
 
-      // =====================================================
-      // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
-      //
-      // IMPORTANT:
-      // Use the generic Forecast API with the explicit
-      // ECMWF IFS model so that "current" conditions are
-      // returned correctly.
-      // =====================================================
-
-      const directParams =
-        new URLSearchParams({
-
-          latitude:
-            String(latitude),
-
-          longitude:
-            String(longitude),
-
-          models:
-            "ecmwf_ifs",
-
-          current:
-            "temperature_2m," +
-            "relative_humidity_2m," +
-            "precipitation," +
-            "rain," +
-            "weather_code," +
-            "wind_speed_10m",
-
-          hourly:
-            "soil_moisture_0_to_7cm",
-
-          timezone:
-            "auto",
-
-          temperature_unit:
-            "celsius",
-
-          wind_speed_unit:
-            "kmh"
-
-        });
-
-
-      const directUrl =
-        "https://api.open-meteo.com/v1/forecast?" +
-        directParams.toString();
-
-
-      console.log(
-        "Fetching direct ECMWF current weather:",
-        directUrl
-      );
-
-
-      const directResponse =
-        await fetch(directUrl);
-
-
-      console.log(
-        "Direct ECMWF current-weather response status:",
-        directResponse.status
-      );
-
-
-      if (!directResponse.ok) {
-
-        const errorText =
-          await directResponse.text();
-
-        throw new Error(
-          `Direct ECMWF current-weather API error ` +
-          `${directResponse.status}: ${errorText}`
+        console.log(
+          "Direct ECMWF current-weather response:",
+          directData
         );
 
-      }
 
-
-      const directData =
-        await directResponse.json();
-
-
-      console.log(
-        "Direct ECMWF current-weather response:",
-        directData
-      );
-
-
-      const current =
-        directData.current;
-
-
-      if (
-        !current ||
-        current.temperature_2m == null
-      ) {
-
-        throw new Error(
-          "Direct ECMWF response contains no current weather data."
-        );
-
-      }
-
-
-      // =====================================================
-      // SOIL MOISTURE
-      //
-      // The current endpoint does not need soil moisture in
-      // the current block. Use the first available hourly
-      // soil-moisture value when present.
-      // =====================================================
-
-      let soilMoisture =
-        null;
-
-
-      const hourly =
-        directData.hourly || {};
-
-
-      if (
-        Array.isArray(
-          hourly.soil_moisture_0_to_7cm
-        ) &&
-        hourly.soil_moisture_0_to_7cm.length > 0
-      ) {
-
-        const firstSoilValue =
-          Number(
-            hourly.soil_moisture_0_to_7cm[0]
-          );
+        const current =
+          directData.current;
 
 
         if (
-          Number.isFinite(firstSoilValue)
+          !current ||
+          current.temperature_2m == null
         ) {
 
-          soilMoisture =
-            firstSoilValue;
+          throw new Error(
+            "Direct ECMWF response contains no current weather data."
+          );
 
         }
 
+
+        // =====================================================
+        // SOIL MOISTURE
+        // =====================================================
+
+        let soilMoisture =
+          null;
+
+
+        const hourly =
+          directData.hourly || {};
+
+
+        if (
+          Array.isArray(
+            hourly.soil_moisture_0_to_7cm
+          ) &&
+          hourly.soil_moisture_0_to_7cm.length > 0
+        ) {
+
+          const firstSoilValue =
+            Number(
+              hourly.soil_moisture_0_to_7cm[0]
+            );
+
+
+          if (
+            Number.isFinite(firstSoilValue)
+          ) {
+
+            soilMoisture =
+              firstSoilValue;
+
+          }
+
+        }
+
+
+        // =====================================================
+        // BUILD LANDGUARD CURRENT WEATHER OBJECT
+        // =====================================================
+
+        const currentWeatherData = {
+
+          status:
+            "success",
+
+          location: {
+
+            latitude:
+              latitude,
+
+            longitude:
+              longitude
+
+          },
+
+          time:
+            current.time ??
+            null,
+
+          temperature:
+            current.temperature_2m ??
+            null,
+
+          relative_humidity:
+            current.relative_humidity_2m ??
+            null,
+
+          precipitation:
+            current.precipitation ??
+            null,
+
+          rainfall:
+            current.rain ??
+            null,
+
+          weather_code:
+            current.weather_code ??
+            null,
+
+          wind_speed:
+            current.wind_speed_10m ??
+            null,
+
+          soil_moisture:
+            soilMoisture,
+
+          provider:
+            "Open-Meteo",
+
+          model:
+            "ECMWF IFS",
+
+          data_type:
+            "Current meteorological data",
+
+          live:
+            true,
+
+          cache_status:
+            "direct_open_meteo_fallback"
+
+        };
+
+
+        setCurrentWeather(
+          currentWeatherData
+        );
+
+
+        console.log(
+          "Direct ECMWF current weather used:",
+          currentWeatherData
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "Current weather error:",
+          error
+        );
+
+
+        setCurrentWeatherError(
+          error.message ||
+          "Unable to load current meteorological data."
+        );
+
+
+      } finally {
+
+        setCurrentWeatherLoading(false);
+
       }
 
+    };
 
-      // =====================================================
-      // BUILD LANDGUARD CURRENT WEATHER OBJECT
-      // =====================================================
-
-      const currentWeatherData = {
-
-        status:
-          "success",
-
-        location: {
-
-          latitude:
-            latitude,
-
-          longitude:
-            longitude
-
-        },
-
-        time:
-          current.time ??
-          null,
-
-        temperature:
-          current.temperature_2m ??
-          null,
-
-        relative_humidity:
-          current.relative_humidity_2m ??
-          null,
-
-        precipitation:
-          current.precipitation ??
-          null,
-
-        rainfall:
-          current.rain ??
-          null,
-
-        weather_code:
-          current.weather_code ??
-          null,
-
-        wind_speed:
-          current.wind_speed_10m ??
-          null,
-
-        soil_moisture:
-          soilMoisture,
-
-        provider:
-          "Open-Meteo",
-
-        model:
-          "ECMWF IFS",
-
-        data_type:
-          "Current meteorological data",
-
-        live:
-          true,
-
-        cache_status:
-          "direct_open_meteo_fallback"
-
-      };
-
-
-      setCurrentWeather(
-        currentWeatherData
-      );
-
-
-      console.log(
-        "Direct ECMWF current weather used:",
-        currentWeatherData
-      );
-
-
-    } catch (error) {
-
-      console.error(
-        "Current weather error:",
-        error
-      );
-
-
-      setCurrentWeatherError(
-        error.message ||
-        "Unable to load current meteorological data."
-      );
-
-
-    } finally {
-
-      setCurrentWeatherLoading(false);
-
-    }
-
-  };
 
   // =========================================================
   // SENTINEL-1 PIXEL-LEVEL SATELLITE DATA
-  //
-  // BACKEND:
-  // /satellite-inundation-map
-  //
-  // DATA:
-  // Sentinel-1 pre/post VV change mask
   // =========================================================
 
   const fetchSatelliteData =
@@ -1134,15 +1254,8 @@ const fetchCurrentWeather =
     };
 
 
-
-
   // =========================================================
   // INTEGRATED HAZARD ASSESSMENT
-  //
-  // Combines:
-  // 1. Current AI high-risk probability
-  // 2. Peak 7-day AI forecast high-risk probability
-  // 3. Sentinel-1 SAR candidate coverage
   // =========================================================
 
   const fetchIntegratedRisk = async () => {
@@ -1153,45 +1266,65 @@ const fetchCurrentWeather =
       forecast.length === 0 ||
       !satelliteData
     ) {
+
       return;
+
     }
+
 
     setIntegratedRiskLoading(true);
     setIntegratedRiskError("");
 
+
     try {
 
-      const apiUrl = import.meta.env.VITE_API_URL;
+      const apiUrl =
+        import.meta.env.VITE_API_URL;
+
 
       if (!apiUrl) {
-        throw new Error("VITE_API_URL is not configured.");
+
+        throw new Error(
+          "VITE_API_URL is not configured."
+        );
+
       }
 
-      // Current AI high-risk probability
-      const currentAIHighProbability = Number(
-        result?.probabilities?.High ?? 0
+
+      const currentAIHighProbability =
+        Number(
+          result?.probabilities?.High ?? 0
+        );
+
+
+      const forecastHighProbability =
+        forecast.reduce(
+          (maximum, day) =>
+            Math.max(
+              maximum,
+              Number(
+                day?.risk_probability ?? 0
+              )
+            ),
+          0
+        );
+
+
+      const satelliteCandidatePercent =
+        Number(
+          satelliteData?.mask?.potential_inundation_percent ?? 0
+        );
+
+
+      console.log(
+        "Integrated Hazard Inputs:",
+        {
+          currentAIHighProbability,
+          forecastHighProbability,
+          satelliteCandidatePercent,
+        }
       );
 
-      // Peak high-risk probability across the 7-day AI forecast
-      const forecastHighProbability = forecast.reduce(
-        (maximum, day) =>
-          Math.max(
-            maximum,
-            Number(day?.risk_probability ?? 0)
-          ),
-        0
-      );
-
-      // Sentinel-1 candidate coverage is evidence, not flood probability
-      const satelliteCandidatePercent = Number(
-        satelliteData?.mask?.potential_inundation_percent ?? 0
-      );
-
-      console.log("Integrated Hazard Inputs:", {
-        currentAIHighProbability,
-        forecastHighProbability,
-        satelliteCandidatePercent,
-      });
 
       const url =
         `${apiUrl}/integrated-risk` +
@@ -1205,42 +1338,77 @@ const fetchCurrentWeather =
           satelliteCandidatePercent
         )}`;
 
-      const response = await fetch(url, {
-        method: "POST",
-      });
+
+      const response =
+        await fetch(
+          url,
+          {
+            method: "POST",
+          }
+        );
+
 
       if (!response.ok) {
-        const errorText = await response.text();
+
+        const errorText =
+          await response.text();
+
+
         throw new Error(
           `Integrated hazard request failed: ${errorText}`
         );
+
       }
 
-      const data = await response.json();
 
-      console.log("Integrated Hazard Assessment:", data);
+      const data =
+        await response.json();
 
-      if (data.status !== "success" || !data.result) {
+
+      console.log(
+        "Integrated Hazard Assessment:",
+        data
+      );
+
+
+      if (
+        data.status !== "success" ||
+        !data.result
+      ) {
+
         throw new Error(
           "Invalid integrated hazard response."
         );
+
       }
 
-      setIntegratedRisk(data.result);
+
+      setIntegratedRisk(
+        data.result
+      );
+
 
     } catch (err) {
 
-      console.error("Integrated hazard error:", err);
+      console.error(
+        "Integrated hazard error:",
+        err
+      );
+
 
       setIntegratedRisk(null);
+
 
       setIntegratedRiskError(
         err.message ||
         "Unable to calculate integrated hazard assessment."
       );
 
+
     } finally {
+
       setIntegratedRiskLoading(false);
+
     }
 
   };
@@ -1248,18 +1416,6 @@ const fetchCurrentWeather =
 
   // =========================================================
   // 7-DAY AI INUNDATION FORECAST
-  //
-  // REAL PIPELINE:
-  //
-  // REAL NWP
-  //     ↓
-  // Real rainfall forecast
-  //     ↓
-  // First 7 forecast days
-  //     ↓
-  // LandGuard AI
-  //     ↓
-  // Inundation risk
   // =========================================================
 
   const getSevenDayForecast =
@@ -1276,10 +1432,6 @@ const fetchCurrentWeather =
 
       try {
 
-        // -----------------------------------------------------
-        // CHECK REAL METEOROLOGICAL FORECAST
-        // -----------------------------------------------------
-
         if (
           !Array.isArray(meteorologicalForecast) ||
           meteorologicalForecast.length < 7
@@ -1292,22 +1444,16 @@ const fetchCurrentWeather =
         }
 
 
-        // -----------------------------------------------------
-        // EXTRACT REAL NWP RAINFALL
-        // -----------------------------------------------------
-
         const realRainfallForecast =
           meteorologicalForecast
             .slice(0, 7)
             .map(
               (day) =>
-                Number(day.rainfall || 0)
+                Number(
+                  day.rainfall || 0
+                )
             );
 
-
-        // -----------------------------------------------------
-        // USE CURRENT SOIL MOISTURE
-        // -----------------------------------------------------
 
         let currentSoilMoisture =
           Number(
@@ -1361,19 +1507,11 @@ const fetchCurrentWeather =
         );
 
 
-        // -----------------------------------------------------
-        // LOG REAL NWP VALUES
-        // -----------------------------------------------------
-
         console.log(
           "Live NWP used for AI forecast:",
           realRainfallForecast
         );
 
-
-        // -----------------------------------------------------
-        // SEND REAL RAINFALL TO LANDGUARD AI
-        // -----------------------------------------------------
 
         const apiUrl =
           import.meta.env.VITE_API_URL;
@@ -1433,10 +1571,6 @@ const fetchCurrentWeather =
           );
 
 
-        // -----------------------------------------------------
-        // CHECK BACKEND RESPONSE
-        // -----------------------------------------------------
-
         if (!response.ok) {
 
           const errorText =
@@ -1449,10 +1583,6 @@ const fetchCurrentWeather =
 
         }
 
-
-        // -----------------------------------------------------
-        // READ AI FORECAST
-        // -----------------------------------------------------
 
         const data =
           await response.json();
@@ -1519,8 +1649,6 @@ const fetchCurrentWeather =
   }, []);
 
 
-
-
   // =========================================================
   // AUTO-UPDATE INTEGRATED HAZARD ASSESSMENT
   // =========================================================
@@ -1532,10 +1660,16 @@ const fetchCurrentWeather =
       forecast.length > 0 &&
       satelliteData
     ) {
+
       fetchIntegratedRisk();
+
     }
 
-  }, [result, forecast, satelliteData]);
+  }, [
+    result,
+    forecast,
+    satelliteData
+  ]);
 
 
   // =========================================================
@@ -2012,7 +2146,7 @@ const fetchCurrentWeather =
                   </span>
 
                   <span>
-                   📡 Source: {meteorologicalSource}
+                    📡 Source: {meteorologicalSource}
                   </span>
 
                   <span>
@@ -2592,9 +2726,9 @@ const fetchCurrentWeather =
               </h2>
 
               <p>
-  Predictive risk assessment using real{" "}
-  {meteorologicalSource} rainfall input.
-</p>
+                Predictive risk assessment using real{" "}
+                {meteorologicalSource} rainfall input.
+              </p>
 
               <p className="weather-source">
 
@@ -3049,8 +3183,6 @@ const fetchCurrentWeather =
         </section>
 
 
-
-
         {/* ===================================================
             INTEGRATED HAZARD ASSESSMENT
         ==================================================== */}
@@ -3060,6 +3192,7 @@ const fetchCurrentWeather =
           <div className="panel-header">
 
             <div>
+
               <span className="section-label">
                 🧠 MULTI-SOURCE DATA FUSION
               </span>
@@ -3072,7 +3205,9 @@ const fetchCurrentWeather =
                 Combines current AI risk, 7-day forecast risk,
                 and Sentinel-1 SAR change evidence.
               </p>
+
             </div>
+
 
             <span className="forecast-badge">
               🔗 DATA FUSION
@@ -3080,134 +3215,262 @@ const fetchCurrentWeather =
 
           </div>
 
+
           {integratedRiskLoading && (
+
             <div className="meteorological-status">
               ⏳ Calculating integrated hazard assessment...
             </div>
+
           )}
 
+
           {integratedRiskError && (
+
             <div className="meteorological-error">
               ⚠️ {integratedRiskError}
             </div>
+
           )}
 
-          {integratedRisk && !integratedRiskLoading && (
-            <>
 
-              <div className="prediction-result">
-                <span className="prediction-label">
-                  INTEGRATED HAZARD INDEX
-                </span>
+          {integratedRisk &&
+            !integratedRiskLoading && (
 
-                <strong>
-                  {integratedRisk.index}
-                </strong>
+              <>
 
-                <p>
-                  Prototype multi-source evidence index • Not a calibrated flood probability
-                </p>
-              </div>
+                <div className="prediction-result">
 
-              <div className="current-weather-grid">
+                  <span className="prediction-label">
+                    INTEGRATED HAZARD INDEX
+                  </span>
 
-                <div className="weather-card">
-                  <span>⚠️</span>
-                  <small>Hazard Level</small>
-                  <strong>{integratedRisk.level}</strong>
-                </div>
-
-                <div className="weather-card">
-                  <span>🤖</span>
-                  <small>Current AI Signal</small>
                   <strong>
-                    {integratedRisk.components?.current_ai?.value ?? "--"}%
+                    {integratedRisk.index}
                   </strong>
+
+                  <p>
+                    Prototype multi-source evidence index • Not a calibrated flood probability
+                  </p>
+
                 </div>
 
-                <div className="weather-card">
-                  <span>🌧️</span>
-                  <small>Peak 7-Day Forecast Signal</small>
-                  <strong>
-                    {integratedRisk.components?.forecast?.value ?? "--"}%
-                  </strong>
-                </div>
 
-                <div className="weather-card">
-                  <span>🛰️</span>
-                  <small>Sentinel-1 Candidate Coverage</small>
-                  <strong>
-                    {integratedRisk.components?.sentinel1_sar?.value ?? "--"}%
-                  </strong>
-                </div>
+                <div className="current-weather-grid">
 
-              </div>
+                  <div className="weather-card">
 
-              <div className="validation-flow">
+                    <span>
+                      ⚠️
+                    </span>
 
-                <div className="validation-card">
-                  <span className="validation-icon">🤖</span>
-                  <strong>Current AI</strong>
-                  <small>Weight: 50%</small>
-                  <div className="validation-status">
-                    Contribution: {integratedRisk.components?.current_ai?.weighted_contribution ?? "--"}
+                    <small>
+                      Hazard Level
+                    </small>
+
+                    <strong>
+                      {integratedRisk.level}
+                    </strong>
+
                   </div>
-                </div>
 
-                <div className="validation-arrow">+</div>
 
-                <div className="validation-card">
-                  <span className="validation-icon">🌧️</span>
-                  <strong>7-Day Forecast</strong>
-                  <small>Weight: 30%</small>
-                  <div className="validation-status">
-                    Contribution: {integratedRisk.components?.forecast?.weighted_contribution ?? "--"}
+                  <div className="weather-card">
+
+                    <span>
+                      🤖
+                    </span>
+
+                    <small>
+                      Current AI Signal
+                    </small>
+
+                    <strong>
+                      {integratedRisk.components?.current_ai?.value ?? "--"}%
+                    </strong>
+
                   </div>
-                </div>
 
-                <div className="validation-arrow">+</div>
 
-                <div className="validation-card">
-                  <span className="validation-icon">🛰️</span>
-                  <strong>Sentinel-1 SAR</strong>
-                  <small>Weight: 20%</small>
-                  <div className="validation-status">
-                    Contribution: {integratedRisk.components?.sentinel1_sar?.weighted_contribution ?? "--"}
+                  <div className="weather-card">
+
+                    <span>
+                      🌧️
+                    </span>
+
+                    <small>
+                      Peak 7-Day Forecast Signal
+                    </small>
+
+                    <strong>
+                      {integratedRisk.components?.forecast?.value ?? "--"}%
+                    </strong>
+
                   </div>
+
+
+                  <div className="weather-card">
+
+                    <span>
+                      🛰️
+                    </span>
+
+                    <small>
+                      Sentinel-1 Candidate Coverage
+                    </small>
+
+                    <strong>
+                      {integratedRisk.components?.sentinel1_sar?.value ?? "--"}%
+                    </strong>
+
+                  </div>
+
                 </div>
 
-              </div>
 
-              <div className="validation-note">
-                <strong>Interpretation:</strong>{" "}
-                {integratedRisk.interpretation}
-              </div>
+                <div className="validation-flow">
 
-              {integratedRisk.evidence?.length > 0 && (
+                  <div className="validation-card">
+
+                    <span className="validation-icon">
+                      🤖
+                    </span>
+
+                    <strong>
+                      Current AI
+                    </strong>
+
+                    <small>
+                      Weight: 50%
+                    </small>
+
+                    <div className="validation-status">
+                      Contribution:{" "}
+                      {integratedRisk.components?.current_ai?.weighted_contribution ?? "--"}
+                    </div>
+
+                  </div>
+
+
+                  <div className="validation-arrow">
+                    +
+                  </div>
+
+
+                  <div className="validation-card">
+
+                    <span className="validation-icon">
+                      🌧️
+                    </span>
+
+                    <strong>
+                      7-Day Forecast
+                    </strong>
+
+                    <small>
+                      Weight: 30%
+                    </small>
+
+                    <div className="validation-status">
+                      Contribution:{" "}
+                      {integratedRisk.components?.forecast?.weighted_contribution ?? "--"}
+                    </div>
+
+                  </div>
+
+
+                  <div className="validation-arrow">
+                    +
+                  </div>
+
+
+                  <div className="validation-card">
+
+                    <span className="validation-icon">
+                      🛰️
+                    </span>
+
+                    <strong>
+                      Sentinel-1 SAR
+                    </strong>
+
+                    <small>
+                      Weight: 20%
+                    </small>
+
+                    <div className="validation-status">
+                      Contribution:{" "}
+                      {integratedRisk.components?.sentinel1_sar?.weighted_contribution ?? "--"}
+                    </div>
+
+                  </div>
+
+                </div>
+
+
                 <div className="validation-note">
-                  <strong>Evidence:</strong>
-                  <ul>
-                    {integratedRisk.evidence.map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))}
-                  </ul>
+
+                  <strong>
+                    Interpretation:
+                  </strong>{" "}
+
+                  {integratedRisk.interpretation}
+
                 </div>
-              )}
 
-              <div className="validation-note">
-                <strong>⚠️ Validation status:</strong>{" "}
-                {integratedRisk.validation_note}
-              </div>
 
-            </>
-          )}
+                {integratedRisk.evidence?.length > 0 && (
+
+                  <div className="validation-note">
+
+                    <strong>
+                      Evidence:
+                    </strong>
+
+                    <ul>
+
+                      {integratedRisk.evidence.map(
+                        (item, index) => (
+
+                          <li key={index}>
+                            {item}
+                          </li>
+
+                        )
+                      )}
+
+                    </ul>
+
+                  </div>
+
+                )}
+
+
+                <div className="validation-note">
+
+                  <strong>
+                    ⚠️ Validation status:
+                  </strong>{" "}
+
+                  {integratedRisk.validation_note}
+
+                </div>
+
+              </>
+
+            )}
+
 
           {!integratedRisk &&
             !integratedRiskLoading &&
             !integratedRiskError && (
+
               <div className="validation-note">
+
                 Integrated assessment will appear after the current AI prediction, 7-day AI forecast, and Sentinel-1 observation are available.
+
               </div>
+
             )}
 
         </section>
@@ -3851,7 +4114,10 @@ const fetchCurrentWeather =
             <div className="map-container">
 
               <MapContainer
-                center={[26.15, 91.73]}
+                center={[
+                  26.15,
+                  91.73
+                ]}
                 zoom={6}
                 scrollWheelZoom={true}
                 style={{
@@ -3910,7 +4176,9 @@ const fetchCurrentWeather =
                       🛰️ Sentinel-1 SAR
                     </strong>
 
+
                     <div>
+
                       <span
                         style={{
                           display: "inline-block",
@@ -3923,7 +4191,9 @@ const fetchCurrentWeather =
                       ></span>
 
                       Potential inundation candidate
+
                     </div>
+
 
                     <div>
                       Coverage:
