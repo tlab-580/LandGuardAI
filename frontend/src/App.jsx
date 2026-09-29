@@ -1365,7 +1365,7 @@ function App() {
               </h2>
 
               <p>
-                Numerical Weather Prediction using
+                Numerical Weather Prediction using{"."}
                 {meteorologicalSource}. Forecast values are obtained
                 from a real meteorological forecast model
                 rather than a synthetic scenario.
@@ -1412,7 +1412,7 @@ function App() {
                   </span>
 
                   <span>
-                   📡 Source: ECMWF IFS
+                   📡 Source: {meteorologicalSource}
                   </span>
 
                   <span>
@@ -1993,8 +1993,8 @@ function App() {
 
               <p>
                 Predictive risk assessment using
-real {meteorologicalSource} rainfall input.
-                real ECMWF IFS rainfall input.
+real{" "} {meteorologicalSource} rainfall input.
+               
               </p>
 
               <p className="weather-source">
@@ -2044,7 +2044,7 @@ real {meteorologicalSource} rainfall input.
               <div>
 
                 <strong>
-                  ECMWF IFS
+                  {meteorologicalSource}
                 </strong>
 
                 <small>
