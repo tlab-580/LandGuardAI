@@ -222,8 +222,11 @@ function App() {
   // =========================================================
   // REAL METEOROLOGICAL FORECAST
   // =========================================================
+  // =========================================================
+// REAL METEOROLOGICAL FORECAST
+// =========================================================
 
-  const fetchMeteorologicalForecast =
+const fetchMeteorologicalForecast =
   async () => {
 
     setMeteorologicalLoading(true);
@@ -237,73 +240,75 @@ function App() {
       const apiUrl =
         import.meta.env.VITE_API_URL;
 
-      if (!apiUrl) {
-        throw new Error(
-          "VITE_API_URL is not configured."
-        );
-      }
-
 
       // =====================================================
       // 1. TRY LANDGUARD BACKEND FIRST
       // =====================================================
 
-      const backendUrl =
-        `${apiUrl}/meteorological-forecast` +
-        `?latitude=${latitude}` +
-        `&longitude=${longitude}` +
-        `&days=15`;
+      if (apiUrl) {
 
-      console.log(
-        "Fetching meteorological forecast:",
-        backendUrl
-      );
-
-      const backendResponse =
-        await fetch(backendUrl);
-
-      console.log(
-        "Meteorological backend response status:",
-        backendResponse.status
-      );
-
-      if (backendResponse.ok) {
-
-        const backendData =
-          await backendResponse.json();
+        const backendUrl =
+          `${apiUrl}/meteorological-forecast` +
+          `?latitude=${latitude}` +
+          `&longitude=${longitude}` +
+          `&days=15`;
 
         console.log(
-          "Meteorological backend response:",
-          backendData
+          "Fetching meteorological forecast:",
+          backendUrl
         );
 
+        try {
 
-        if (
-          backendData.status === "success" &&
-          Array.isArray(backendData.forecast)
-        ) {
+          const backendResponse =
+            await fetch(backendUrl);
 
-          // Accept backend forecast only when it
-          // actually satisfies the requested 15-day horizon.
-          if (
-            backendData.forecast.length >= 15
-          ) {
+          console.log(
+            "Meteorological backend response status:",
+            backendResponse.status
+          );
 
-            setMeteorologicalForecast(
-              backendData.forecast.slice(0, 15)
-            );
+          if (backendResponse.ok) {
+
+            const backendData =
+              await backendResponse.json();
 
             console.log(
-              "15-day forecast supplied by LandGuard backend:",
-              backendData.source
+              "Meteorological backend response:",
+              backendData
             );
 
-            return;
+            if (
+              backendData.status === "success" &&
+              Array.isArray(backendData.forecast) &&
+              backendData.forecast.length >= 15
+            ) {
+
+              setMeteorologicalForecast(
+                backendData.forecast.slice(0, 15)
+              );
+
+              console.log(
+                "15-day forecast supplied by LandGuard backend:",
+                backendData.source
+              );
+
+              return;
+            }
+
+            console.warn(
+              `Backend returned only ${
+                backendData.forecast?.length ?? 0
+              } days. Fetching 15-day ECMWF forecast directly from Open-Meteo.`
+            );
+
           }
 
+        } catch (backendError) {
+
           console.warn(
-            `Backend returned only ${backendData.forecast.length} days. ` +
-            "Fetching 15-day ECMWF forecast directly from Open-Meteo."
+            "LandGuard meteorological backend unavailable:",
+            backendError
           );
 
         }
@@ -313,12 +318,25 @@ function App() {
 
       // =====================================================
       // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
+      //
+      // Generic Forecast API + explicit ECMWF IFS model.
+      //
+      // Hourly temperature is requested as a fallback for
+      // incomplete daily temperature values near the end
+      // of the forecast horizon.
       // =====================================================
 
       const directParams =
         new URLSearchParams({
-          latitude: String(latitude),
-          longitude: String(longitude),
+
+          latitude:
+            String(latitude),
+
+          longitude:
+            String(longitude),
+
+          models:
+            "ecmwf_ifs",
 
           daily:
             "rain_sum," +
@@ -327,13 +345,23 @@ function App() {
             "temperature_2m_min," +
             "precipitation_hours",
 
-          timezone: "auto",
-          forecast_days: "15"
+          hourly:
+            "temperature_2m",
+
+          timezone:
+            "auto",
+
+          forecast_days:
+            "15",
+
+          temperature_unit:
+            "celsius"
+
         });
 
 
       const directUrl =
-        "https://api.open-meteo.com/v1/ecmwf?" +
+        "https://api.open-meteo.com/v1/forecast?" +
         directParams.toString();
 
 
@@ -402,52 +430,216 @@ function App() {
       }
 
 
+      // =====================================================
+      // BUILD HOURLY TEMPERATURE FALLBACK
+      // =====================================================
+
+      const hourly =
+        directData.hourly || {};
+
+      const hourlyTimes =
+        Array.isArray(hourly.time)
+          ? hourly.time
+          : [];
+
+      const hourlyTemperatures =
+        Array.isArray(hourly.temperature_2m)
+          ? hourly.temperature_2m
+          : [];
+
+
+      const hourlyTemperatureByDate = {};
+
+
+      for (
+        let index = 0;
+        index < hourlyTimes.length;
+        index++
+      ) {
+
+        const timeValue =
+          hourlyTimes[index];
+
+        const temperatureValue =
+          hourlyTemperatures[index];
+
+
+        if (
+          timeValue == null ||
+          temperatureValue == null
+        ) {
+          continue;
+        }
+
+
+        const numericTemperature =
+          Number(temperatureValue);
+
+
+        if (
+          !Number.isFinite(numericTemperature)
+        ) {
+          continue;
+        }
+
+
+        const dateKey =
+          String(timeValue).split("T")[0];
+
+
+        if (
+          !hourlyTemperatureByDate[dateKey]
+        ) {
+
+          hourlyTemperatureByDate[dateKey] =
+            [];
+
+        }
+
+
+        hourlyTemperatureByDate[dateKey].push(
+          numericTemperature
+        );
+
+      }
+
+
+      // =====================================================
+      // CREATE 15-DAY INTERNAL FORECAST
+      // =====================================================
+
       const forecast =
         daily.time
           .slice(0, 15)
           .map(
-            (date, index) => ({
+            (date, index) => {
 
-              day:
-                index + 1,
+              const dailyMaxValue =
+                daily.temperature_2m_max?.[index];
 
-              date,
+              const dailyMinValue =
+                daily.temperature_2m_min?.[index];
 
-              rainfall:
-                Number(
-                  daily.rain_sum?.[index] ??
-                  0
-                ),
 
-              precipitation:
-                Number(
-                  daily.precipitation_sum?.[index] ??
-                  0
-                ),
+              const dailyMax =
+                Number(dailyMaxValue);
 
-              temperature_max:
-                daily.temperature_2m_max?.[index] ??
-                null,
+              const dailyMin =
+                Number(dailyMinValue);
 
-              temperature_min:
-                daily.temperature_2m_min?.[index] ??
-                null,
 
-              precipitation_hours:
-                daily.precipitation_hours?.[index] ??
-                null,
+              const hourlyValues =
+                hourlyTemperatureByDate[date] ||
+                [];
 
-              source:
-                "ECMWF IFS",
 
-              provider:
-                "Open-Meteo",
+              // ------------------------------------------------
+              // DAILY TEMPERATURE
+              // ------------------------------------------------
 
-              data_type:
-                "Numerical Weather Prediction"
+              let temperatureMax =
+                Number.isFinite(dailyMax)
+                  ? dailyMax
+                  : null;
 
-            })
+
+              let temperatureMin =
+                Number.isFinite(dailyMin)
+                  ? dailyMin
+                  : null;
+
+
+              // ------------------------------------------------
+              // HOURLY FALLBACK
+              // ------------------------------------------------
+
+              if (
+                temperatureMax == null &&
+                hourlyValues.length > 0
+              ) {
+
+                temperatureMax =
+                  Math.max(
+                    ...hourlyValues
+                  );
+
+              }
+
+
+              if (
+                temperatureMin == null &&
+                hourlyValues.length > 0
+              ) {
+
+                temperatureMin =
+                  Math.min(
+                    ...hourlyValues
+                  );
+
+              }
+
+
+              return {
+
+                day:
+                  index + 1,
+
+                date,
+
+                rainfall:
+                  Number(
+                    daily.rain_sum?.[index] ??
+                    0
+                  ),
+
+                precipitation:
+                  Number(
+                    daily.precipitation_sum?.[index] ??
+                    0
+                  ),
+
+                temperature_max:
+                  temperatureMax,
+
+                temperature_min:
+                  temperatureMin,
+
+                precipitation_hours:
+                  daily.precipitation_hours?.[index] ??
+                  null,
+
+                source:
+                  "ECMWF IFS",
+
+                provider:
+                  "Open-Meteo",
+
+                data_type:
+                  "Numerical Weather Prediction",
+
+                temperature_fallback_used:
+                  !Number.isFinite(dailyMax) ||
+                  !Number.isFinite(dailyMin)
+
+              };
+
+            }
           );
+
+
+      // =====================================================
+      // VALIDATE 15-DAY RESULT
+      // =====================================================
+
+      if (
+        forecast.length < 15
+      ) {
+
+        throw new Error(
+          `Only ${forecast.length} forecast days could be prepared.`
+        );
+
+      }
 
 
       setMeteorologicalForecast(
@@ -487,34 +679,31 @@ function App() {
   // CURRENT METEOROLOGICAL DATA
   // =========================================================
 
-  const fetchCurrentWeather =
-    async () => {
+  // =========================================================
+// CURRENT METEOROLOGICAL DATA
+// =========================================================
 
-      setCurrentWeatherLoading(true);
-      setCurrentWeatherError("");
+const fetchCurrentWeather =
+  async () => {
 
-
-      try {
-
-        const latitude = 26.1445;
-        const longitude = 91.7362;
-
-        const apiUrl =
-          import.meta.env.VITE_API_URL;
+    setCurrentWeatherLoading(true);
+    setCurrentWeatherError("");
 
 
-        if (!apiUrl) {
+    try {
 
-          throw new Error(
-            "VITE_API_URL is not configured."
-          );
+      const latitude = 26.1445;
+      const longitude = 91.7362;
 
-        }
+      const apiUrl =
+        import.meta.env.VITE_API_URL;
 
 
-        // =====================================================
-        // 1. TRY LANDGUARD BACKEND FIRST
-        // =====================================================
+      // =====================================================
+      // 1. TRY LANDGUARD BACKEND FIRST
+      // =====================================================
+
+      if (apiUrl) {
 
         const backendUrl =
           `${apiUrl}/current-weather` +
@@ -576,193 +765,254 @@ function App() {
 
         }
 
-
-        // =====================================================
-        // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
-        // =====================================================
-
-        const directParams =
-          new URLSearchParams({
-
-            latitude:
-              String(latitude),
-
-            longitude:
-              String(longitude),
-
-            current:
-              "temperature_2m," +
-              "relative_humidity_2m," +
-              "precipitation," +
-              "rain," +
-              "weather_code," +
-              "wind_speed_10m," +
-              "soil_moisture_0_to_7cm",
-
-            timezone:
-              "auto"
-
-          });
+      }
 
 
-        const directUrl =
-          "https://api.open-meteo.com/v1/ecmwf?" +
-          directParams.toString();
+      // =====================================================
+      // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
+      //
+      // IMPORTANT:
+      // Use the generic Forecast API with the explicit
+      // ECMWF IFS model so that "current" conditions are
+      // returned correctly.
+      // =====================================================
+
+      const directParams =
+        new URLSearchParams({
+
+          latitude:
+            String(latitude),
+
+          longitude:
+            String(longitude),
+
+          models:
+            "ecmwf_ifs",
+
+          current:
+            "temperature_2m," +
+            "relative_humidity_2m," +
+            "precipitation," +
+            "rain," +
+            "weather_code," +
+            "wind_speed_10m",
+
+          hourly:
+            "soil_moisture_0_to_7cm",
+
+          timezone:
+            "auto",
+
+          temperature_unit:
+            "celsius",
+
+          wind_speed_unit:
+            "kmh"
+
+        });
 
 
-        console.log(
-          "Fetching direct ECMWF current weather:",
-          directUrl
+      const directUrl =
+        "https://api.open-meteo.com/v1/forecast?" +
+        directParams.toString();
+
+
+      console.log(
+        "Fetching direct ECMWF current weather:",
+        directUrl
+      );
+
+
+      const directResponse =
+        await fetch(directUrl);
+
+
+      console.log(
+        "Direct ECMWF current-weather response status:",
+        directResponse.status
+      );
+
+
+      if (!directResponse.ok) {
+
+        const errorText =
+          await directResponse.text();
+
+        throw new Error(
+          `Direct ECMWF current-weather API error ` +
+          `${directResponse.status}: ${errorText}`
         );
-
-
-        const directResponse =
-          await fetch(directUrl);
-
-
-        console.log(
-          "Direct ECMWF current-weather response status:",
-          directResponse.status
-        );
-
-
-        if (!directResponse.ok) {
-
-          const errorText =
-            await directResponse.text();
-
-          throw new Error(
-            `Direct ECMWF current-weather API error ` +
-            `${directResponse.status}: ${errorText}`
-          );
-
-        }
-
-
-        const directData =
-          await directResponse.json();
-
-
-        console.log(
-          "Direct ECMWF current-weather response:",
-          directData
-        );
-
-
-        const current =
-          directData.current;
-
-
-        if (
-          !current ||
-          current.temperature_2m == null
-        ) {
-
-          throw new Error(
-            "Direct ECMWF response contains no current weather data."
-          );
-
-        }
-
-
-        const currentWeatherData = {
-
-          status:
-            "success",
-
-          location: {
-
-            latitude:
-              latitude,
-
-            longitude:
-              longitude
-
-          },
-
-          time:
-            current.time ??
-            null,
-
-          temperature:
-            current.temperature_2m ??
-            null,
-
-          relative_humidity:
-            current.relative_humidity_2m ??
-            null,
-
-          precipitation:
-            current.precipitation ??
-            null,
-
-          rainfall:
-            current.rain ??
-            null,
-
-          weather_code:
-            current.weather_code ??
-            null,
-
-          wind_speed:
-            current.wind_speed_10m ??
-            null,
-
-          soil_moisture:
-            current.soil_moisture_0_to_7cm ??
-            null,
-
-          provider:
-            "Open-Meteo",
-
-          model:
-            "ECMWF IFS",
-
-          data_type:
-            "Current meteorological data",
-
-          live:
-            true,
-
-          cache_status:
-            "direct_open_meteo_fallback"
-
-        };
-
-
-        setCurrentWeather(
-          currentWeatherData
-        );
-
-
-        console.log(
-          "Direct ECMWF current weather used:",
-          currentWeatherData
-        );
-
-
-      } catch (error) {
-
-        console.error(
-          "Current weather error:",
-          error
-        );
-
-
-        setCurrentWeatherError(
-          error.message ||
-          "Unable to load current meteorological data."
-        );
-
-
-      } finally {
-
-        setCurrentWeatherLoading(false);
 
       }
 
-    };
 
+      const directData =
+        await directResponse.json();
+
+
+      console.log(
+        "Direct ECMWF current-weather response:",
+        directData
+      );
+
+
+      const current =
+        directData.current;
+
+
+      if (
+        !current ||
+        current.temperature_2m == null
+      ) {
+
+        throw new Error(
+          "Direct ECMWF response contains no current weather data."
+        );
+
+      }
+
+
+      // =====================================================
+      // SOIL MOISTURE
+      //
+      // The current endpoint does not need soil moisture in
+      // the current block. Use the first available hourly
+      // soil-moisture value when present.
+      // =====================================================
+
+      let soilMoisture =
+        null;
+
+
+      const hourly =
+        directData.hourly || {};
+
+
+      if (
+        Array.isArray(
+          hourly.soil_moisture_0_to_7cm
+        ) &&
+        hourly.soil_moisture_0_to_7cm.length > 0
+      ) {
+
+        const firstSoilValue =
+          Number(
+            hourly.soil_moisture_0_to_7cm[0]
+          );
+
+
+        if (
+          Number.isFinite(firstSoilValue)
+        ) {
+
+          soilMoisture =
+            firstSoilValue;
+
+        }
+
+      }
+
+
+      // =====================================================
+      // BUILD LANDGUARD CURRENT WEATHER OBJECT
+      // =====================================================
+
+      const currentWeatherData = {
+
+        status:
+          "success",
+
+        location: {
+
+          latitude:
+            latitude,
+
+          longitude:
+            longitude
+
+        },
+
+        time:
+          current.time ??
+          null,
+
+        temperature:
+          current.temperature_2m ??
+          null,
+
+        relative_humidity:
+          current.relative_humidity_2m ??
+          null,
+
+        precipitation:
+          current.precipitation ??
+          null,
+
+        rainfall:
+          current.rain ??
+          null,
+
+        weather_code:
+          current.weather_code ??
+          null,
+
+        wind_speed:
+          current.wind_speed_10m ??
+          null,
+
+        soil_moisture:
+          soilMoisture,
+
+        provider:
+          "Open-Meteo",
+
+        model:
+          "ECMWF IFS",
+
+        data_type:
+          "Current meteorological data",
+
+        live:
+          true,
+
+        cache_status:
+          "direct_open_meteo_fallback"
+
+      };
+
+
+      setCurrentWeather(
+        currentWeatherData
+      );
+
+
+      console.log(
+        "Direct ECMWF current weather used:",
+        currentWeatherData
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "Current weather error:",
+        error
+      );
+
+
+      setCurrentWeatherError(
+        error.message ||
+        "Unable to load current meteorological data."
+      );
+
+
+    } finally {
+
+      setCurrentWeatherLoading(false);
+
+    }
+
+  };
 
   // =========================================================
   // SENTINEL-1 PIXEL-LEVEL SATELLITE DATA
