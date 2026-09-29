@@ -145,7 +145,15 @@ def health():
         "version":
             "2.0.0"
     }
+@app.get("/weather-config-status")
+def weather_config_status():
+    import os
 
+    return {
+        "open_meteo_customer_key_configured": bool(
+            os.getenv("OPEN_METEO_API_KEY")
+        )
+    }
 
 # ============================================================
 # SENTINEL-1 AGGREGATED SATELLITE OBSERVATION
