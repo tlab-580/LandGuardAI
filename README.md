@@ -1,262 +1,443 @@
-# 🌍 LandGuard AI
+# 🌧️ LandGuard AI 2.0
 
-### AI-Powered Landslide Early Warning & Disaster Intelligence System
+### AI-Powered Heavy Rainfall, Inundation Forecasting & Disaster Intelligence System
 
-LandGuard AI is an **AI-powered disaster intelligence platform** designed to support **landslide risk assessment, early warning, geospatial visualization, and disaster preparedness**.
+> **Predict the hazard. Map the impact. Prioritize the response.**
 
-The system analyzes multiple environmental and terrain factors such as **rainfall, soil moisture, slope angle, elevation, and vegetation (NDVI)** to estimate landslide risk and present the results through an interactive web dashboard.
+LandGuard AI 2.0 is an AI-powered disaster intelligence platform designed to support **heavy rainfall early warning, inundation risk assessment, satellite-based change detection, geospatial monitoring, and disaster-response prioritization**.
 
-> **Turning environmental data into actionable disaster intelligence.**
+The system combines meteorological forecast data, machine-learning-based risk prediction, Sentinel-1 SAR analysis, GIS visualization, and impact assessment into a unified disaster-management dashboard.
 
 ---
 
-## 🚨 Problem Statement
+## 🚨 Problem
 
-Landslides are a major disaster risk in India's vulnerable hilly regions, particularly during periods of intense and prolonged rainfall.
+Heavy rainfall can rapidly trigger:
 
-Traditional warning approaches may rely heavily on individual indicators such as rainfall thresholds and may not provide sufficiently localized and continuous risk assessment.
+- 🌊 Urban and rural inundation
+- 🛣️ Road and transport disruption
+- 🏠 Community and infrastructure exposure
+- ⛰️ Terrain-related hazards
+- ⚠️ Difficulties in timely emergency response
 
-LandGuard AI addresses this challenge by combining multiple environmental parameters with machine learning to provide:
+Traditional monitoring systems often rely on individual data sources and may not provide a unified view of **forecast rainfall + hazard risk + spatial impact**.
 
-* 🧠 AI-based landslide risk classification
-* 🗺️ Interactive geospatial risk visualization
-* 📊 Multi-factor environmental analysis
-* 🔮 7-day predictive risk forecasting framework
-* ⚠️ Early-warning oriented risk information
-* 🚑 Disaster preparedness and response support
+LandGuard AI 2.0 addresses this challenge by integrating multiple information sources into a single decision-support platform.
+
+---
+
+## 💡 Solution
+
+LandGuard AI 2.0 follows the pipeline:
+
+```text
+Satellite + Weather + NWP
+            ↓
+       Data Fusion
+            ↓
+ Heavy Rainfall Forecast
+            ↓
+  Inundation Risk Prediction
+            ↓
+ Probability + Confidence
+            ↓
+        GIS Risk Map
+            ↓
+ Villages + Roads + Assets
+            ↓
+     Impact Assessment
+            ↓
+ Response Prioritization
+            ↓
+       Early Warning
+```
+
+### Core Workflow
+
+**Sense → Predict → Map → Assess → Prioritize → Warn → Respond**
 
 ---
 
 # ✨ Key Features
 
-## 🧠 AI-Based Risk Prediction
+## 🌦️ Real-Time Meteorological Data
 
-LandGuard AI uses a machine-learning classification model to analyze:
+The platform retrieves live meteorological information including:
 
-* 🌧️ Rainfall in the last 24 hours
-* 🌧️ Cumulative 7-day rainfall
-* 💧 Soil moisture
-* ⛰️ Slope angle
-* 📍 Elevation
-* 🌱 NDVI / vegetation information
+- Temperature
+- Relative humidity
+- Rainfall
+- Precipitation
+- Wind speed
+- Soil moisture
+- Weather conditions
 
-The model classifies the estimated landslide risk as:
-
-* 🟢 **Low**
-* 🟡 **Moderate**
-* 🔴 **High**
+The dashboard can use **Open-Meteo / ECMWF IFS** meteorological data when the backend provider is unavailable.
 
 ---
 
-## 🗺️ Interactive Risk Map
+## 📅 15-Day Numerical Weather Prediction
 
-The frontend provides an interactive map using:
+LandGuard AI 2.0 uses **ECMWF IFS numerical weather prediction data** for a 15-day meteorological outlook.
 
-* React
-* Leaflet
-* OpenStreetMap
+The system displays:
 
-This allows risk information to be visualized geographically and provides a foundation for future regional risk-monitoring systems.
+- Daily rainfall
+- Maximum temperature
+- Minimum temperature
+- Precipitation hours
+- Forecast source and model
 
----
-
-## 🔮 7-Day Forecasting
-
-LandGuard AI includes a forecasting workflow designed to evaluate changing landslide risk over a **7-day period**.
-
-The current prototype uses forecast rainfall inputs and combines them with terrain and environmental parameters.
-
-Future versions can integrate real-time weather APIs and continuously updated environmental data.
+This forecast provides the meteorological input used by the downstream hazard-analysis pipeline.
 
 ---
 
-## 📊 Disaster Intelligence Dashboard
+## 🤖 AI-Based Inundation Risk Prediction
 
-The dashboard provides a centralized interface for:
+A machine-learning model evaluates environmental inputs to estimate inundation-risk conditions.
 
-* Current risk assessment
-* Environmental inputs
-* Risk classification
-* Prediction confidence
-* Geographic visualization
-* Forecast information
-* Disaster intelligence
-
----
-
-## 🤖 Disaster Copilot
-
-The project also includes a planned AI-assisted disaster intelligence interface designed to help users understand:
-
-* Risk levels
-* Potentially affected locations
-* Emergency actions
-* Disaster-management guidance
-* Preparedness recommendations
-
----
-
-# 🏗️ System Architecture
+Current model inputs include:
 
 ```text
-                    ENVIRONMENTAL DATA
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-       Rainfall       Soil Moisture     Terrain Data
-          │                │                │
-          └────────────────┼────────────────┘
-                           │
-                         NDVI
+Rainfall
+Soil Moisture
+Slope Angle
+Elevation
+NDVI
+```
+
+The model produces risk probabilities for:
+
+- 🔴 High
+- 🟠 Moderate
+- 🟢 Low
+
+The dashboard presents the corresponding AI confidence/probability to support scenario analysis.
+
+---
+
+## 📊 7-Day AI Hazard Forecast
+
+Meteorological rainfall forecasts are passed through the AI prediction pipeline to produce a **7-day hazard forecast**.
+
+For each forecast day, the dashboard provides:
+
+- Forecast rainfall
+- High-risk probability
+- Moderate-risk probability
+- Low-risk probability
+- Risk classification
+
+This allows users to inspect the evolution of hazard conditions over the upcoming week.
+
+---
+
+## 🛰️ Sentinel-1 SAR Inundation Candidate Detection
+
+LandGuard AI 2.0 integrates **Sentinel-1 Synthetic Aperture Radar (SAR)** imagery for change detection.
+
+The SAR workflow compares:
+
+```text
+Pre-event Sentinel-1 SAR
+          ↓
+Backscatter Comparison
+          ↓
+Post-event Sentinel-1 SAR
+          ↓
+Change Detection
+          ↓
+Potential Inundation Candidates
+```
+
+The current implementation calculates:
+
+- Pre-event acquisition
+- Post-event acquisition
+- Time gap
+- Detection threshold
+- Valid pixels
+- Candidate pixels
+- Candidate coverage
+- Candidate area
+
+### Important
+
+The SAR output is currently a **potential inundation candidate mask**, not a fully validated flood boundary product.
+
+---
+
+## 🗺️ GIS Monitoring
+
+The dashboard provides a geospatial monitoring interface for visualizing the disaster scenario.
+
+The GIS layer is intended to help identify:
+
+- Potentially affected regions
+- Hazard zones
+- Infrastructure exposure
+- Roads
+- Settlements
+- Other response-relevant locations
+
+---
+
+## 🔗 Integrated Hazard Index
+
+LandGuard AI 2.0 combines multiple evidence sources into an integrated prototype hazard index.
+
+Current components:
+
+```text
+Current AI Risk
+      +
+7-Day Forecast Risk
+      +
+Sentinel-1 Candidate Evidence
+      ↓
+Integrated Hazard Index
+```
+
+Current prototype weighting:
+
+```text
+AI Current Risk       = 50%
+Forecast Risk         = 30%
+SAR Evidence          = 20%
+```
+
+Hazard bands:
+
+```text
+75+     → VERY HIGH
+50–74   → HIGH
+25–49   → MODERATE
+0–24    → LOW
+```
+
+### ⚠️ Important Note
+
+The integrated index is a **prototype evidence-fusion score** and should not be interpreted as a calibrated probability of flooding.
+
+The weights and thresholds require validation against historical disaster events and field observations before operational deployment.
+
+---
+
+# 🧠 AI Architecture
+
+```text
+                ┌─────────────────────┐
+                │ Meteorological Data │
+                │  Weather + NWP      │
+                └──────────┬──────────┘
                            │
                            ▼
                 ┌─────────────────────┐
                 │   Data Processing   │
-                │ & Feature Handling  │
                 └──────────┬──────────┘
                            │
                            ▼
                 ┌─────────────────────┐
                 │   ML Risk Model     │
-                │   Scikit-learn      │
+                └──────────┬──────────┘
+                           │
+                  ┌────────┴────────┐
+                  ▼                 ▼
+          7-Day Risk Forecast   Current Risk
+                  │                 │
+                  └────────┬────────┘
+                           ▼
+                ┌─────────────────────┐
+                │ Sentinel-1 SAR      │
+                │ Change Detection    │
                 └──────────┬──────────┘
                            │
                            ▼
                 ┌─────────────────────┐
-                │ Risk Classification │
-                │ Low / Moderate/High│
+                │ Integrated Hazard   │
+                │      Index          │
                 └──────────┬──────────┘
                            │
-             ┌─────────────┴─────────────┐
-             │                           │
-             ▼                           ▼
-      Risk Dashboard              Interactive Map
-             │                           │
-             └─────────────┬─────────────┘
+                           ▼
+                ┌─────────────────────┐
+                │ GIS + Impact        │
+                │ Assessment          │
+                └──────────┬──────────┘
                            │
                            ▼
-                 Disaster Intelligence
-```
-
----
-
-# 🔄 Prediction Workflow
-
-```text
-User / Data Source
-       │
-       ▼
-Environmental Parameters
-       │
-       ├── Rainfall 24h
-       ├── Rainfall 7d
-       ├── Soil Moisture
-       ├── Slope Angle
-       ├── Elevation
-       └── NDVI
-       │
-       ▼
-FastAPI Backend
-       │
-       ▼
-Machine Learning Model
-       │
-       ▼
-Risk Prediction
-       │
-       ├── Low
-       ├── Moderate
-       └── High
-       │
-       ▼
-React Dashboard
-       │
-       ▼
-Map + Risk Insights + Forecast
+                ┌─────────────────────┐
+                │ Early Warning &     │
+                │ Decision Support    │
+                └─────────────────────┘
 ```
 
 ---
 
 # 🛠️ Technology Stack
 
-### Frontend
+## Frontend
 
-* React.js
-* JavaScript / JSX
-* Vite
-* Leaflet
-* OpenStreetMap
-* CSS
+- React
+- Vite
+- JavaScript
+- React Leaflet
+- Leaflet
+- Recharts
+- CSS
 
-### Backend
+## Backend
 
-* Python
-* FastAPI
-* Uvicorn
-* REST API
+- Python
+- FastAPI
+- REST APIs
+- Uvicorn
 
-### AI / Machine Learning
+## Machine Learning
 
-* Scikit-learn
-* Pandas
-* NumPy
-* Machine Learning Classification
+- Python
+- Scikit-learn
+- Pickle model serialization
+- Feature-based risk prediction
 
-### Data
+## Satellite / Remote Sensing
 
-* CSV-based landslide training dataset
-* Rainfall
-* Soil moisture
-* Slope angle
-* Elevation
-* NDVI
+- Sentinel-1 SAR
+- Copernicus Data Space Ecosystem
+- SAR backscatter change detection
 
-### Development Tools
+## Weather / NWP
 
-* Visual Studio Code
-* Git
-* GitHub
+- Open-Meteo
+- ECMWF IFS
+- Meteorological forecast data
 
-### Deployment
+## Deployment
 
-* Vercel — Frontend
-* Render — Backend
+- **Frontend:** Vercel
+- **Backend:** Render
+- **Source Control:** GitHub
 
 ---
 
 # 📁 Project Structure
 
 ```text
-LandGuardAI/
+LANDGUARD-AI/
 │
 ├── backend/
-│   └── main.py
+│   ├── main.py
+│   ├── requirements.txt
+│   │
+│   └── services/
+│       ├── __init__.py
+│       ├── rainfall_service.py
+│       ├── satellite_service.py
+│       ├── sar_inundation_service.py
+│       └── integrated_risk_service.py
+│
+├── data/
+│   ├── legacy_landslide_training_data.csv
+│   └── rainfall_inundation_training_data.csv
 │
 ├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── ...
+│   ├── .env
 │   ├── package.json
-│   └── vite.config.js
+│   ├── vite.config.js
+│   │
+│   └── src/
+│       ├── App.jsx
+│       ├── App.css
+│       └── main.jsx
 │
 ├── ml/
 │   ├── create_dataset.py
 │   ├── train_model.py
 │   ├── predict.py
+│   │
 │   └── models/
-│       └── landslide_risk_model.pkl
+│       ├── legacy_landslide_risk_model.pkl
+│       └── inundation_risk_model.pkl
 │
-├── data/
-│   └── landslide_training_data.csv
-│
+├── requirements.txt
+├── render.yaml
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-# ⚙️ Installation & Setup
+# 🔌 API Endpoints
+
+The FastAPI backend currently exposes endpoints including:
+
+```text
+GET  /
+GET  /health
+GET  /weather-config-status
+GET  /current-weather
+GET  /meteorological-forecast
+GET  /rainfall-forecast
+GET  /satellite-inundation
+GET  /satellite-inundation-map
+
+POST /predict-inundation-risk
+
+GET  /forecast-7days
+GET  /integrated-risk
+```
+
+### Health Check
+
+```http
+GET /health
+```
+
+Example response:
+
+```json
+{
+  "status": "healthy",
+  "model": "inundation_risk_model",
+  "model_loaded": true,
+  "version": "2.0.0"
+}
+```
+
+---
+
+# 📡 Data Sources
+
+LandGuard AI 2.0 is designed around multiple disaster-intelligence data sources:
+
+| Data Source | Purpose |
+|---|---|
+| ECMWF IFS | Numerical weather prediction |
+| Open-Meteo | Meteorological data access |
+| Sentinel-1 SAR | Surface/backscatter change detection |
+| Copernicus Data Space | Sentinel satellite data access |
+| ML Model | Hazard-risk prediction |
+| GIS Data | Spatial monitoring and impact assessment |
+
+---
+
+# 📈 Example SAR Analysis
+
+A representative Sentinel-1 processing result from the prototype:
+
+```text
+Candidate Coverage : 13.04%
+Candidate Area     : 14.4699 km²
+Threshold          : -3 dB
+Time Gap           : 5.01 days
+Valid Pixels       : 44,472
+Candidate Pixels   : 5,798
+```
+
+These values demonstrate the current SAR change-detection workflow for a test region.
+
+---
+
+# 🚀 Running Locally
 
 ## 1. Clone the Repository
 
@@ -267,39 +448,59 @@ cd LandGuardAI
 
 ---
 
-# 🐍 Backend Setup
-
-Navigate to the backend directory:
-
-```bash
-cd backend
-```
-
-Create a virtual environment:
+## 2. Create Python Environment
 
 ```bash
 python -m venv venv
 ```
 
-Activate the environment on Windows:
+### Windows
 
 ```bash
-venv\Scripts\activate
+source venv/Scripts/activate
 ```
 
-Install dependencies:
+---
+
+## 3. Install Backend Dependencies
 
 ```bash
-pip install fastapi uvicorn pandas numpy scikit-learn
+pip install -r requirements.txt
 ```
 
-Run the backend:
+or:
 
 ```bash
-uvicorn main:app --reload
+pip install -r backend/requirements.txt
 ```
 
-The backend will run at:
+---
+
+## 4. Configure Environment Variables
+
+Create:
+
+```text
+backend/.env
+```
+
+Store required API credentials/configuration there.
+
+**Do not commit secrets to GitHub.**
+
+The repository uses `.gitignore` to prevent sensitive environment files from being committed.
+
+---
+
+## 5. Start FastAPI Backend
+
+From the project root:
+
+```bash
+uvicorn backend.main:app --reload
+```
+
+The backend will normally be available at:
 
 ```text
 http://127.0.0.1:8000
@@ -313,310 +514,205 @@ http://127.0.0.1:8000/docs
 
 ---
 
-# ⚛️ Frontend Setup
+## 6. Start Frontend
 
-Open another terminal and navigate to the frontend:
+Open a second terminal:
 
 ```bash
 cd frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
-```
-
-Run the development server:
-
-```bash
 npm run dev
 ```
 
-The frontend will usually be available at:
+The Vite development server will provide the local frontend URL.
+
+---
+
+# 🏗️ Build Frontend for Production
+
+```bash
+cd frontend
+npm run build
+```
+
+The production files are generated in:
 
 ```text
-http://localhost:5173
+frontend/dist/
 ```
 
 ---
 
-# 🔌 API
+# ☁️ Deployment
 
-## Health Check
+## Frontend
 
-```http
-GET /health
-```
+The React frontend is deployed through **Vercel**.
 
-Example response:
+## Backend
 
-```json
-{
-  "status": "healthy",
-  "model": "loaded"
-}
-```
+The FastAPI backend is deployed through **Render**.
 
----
+### Live Application
 
-## Landslide Risk Prediction
-
-```http
-POST /predict-risk
-```
-
-Example input:
-
-```json
-{
-  "rainfall_24h": 120,
-  "rainfall_7d": 450,
-  "soil_moisture": 82,
-  "slope_angle": 42,
-  "elevation": 1200,
-  "ndvi": 0.35
-}
-```
-
-Example output:
-
-```json
-{
-  "risk_level": "High",
-  "confidence": 0.95
-}
-```
-
----
-
-# 📈 Machine Learning Model
-
-The prototype uses a supervised machine-learning classification approach.
-
-### Input Features
-
-| Feature       | Description                                |
-| ------------- | ------------------------------------------ |
-| Rainfall 24h  | Rainfall received during the last 24 hours |
-| Rainfall 7d   | Cumulative rainfall over seven days        |
-| Soil Moisture | Estimated soil saturation/moisture         |
-| Slope Angle   | Terrain slope                              |
-| Elevation     | Elevation above sea level                  |
-| NDVI          | Vegetation index                           |
-
-### Output
-
-```text
-Low
-Moderate
-High
-```
-
-### Prototype Model Performance
-
-The current training experiment achieved approximately:
-
-**93.5% overall accuracy**
-
-Class-level performance varies because the available prototype dataset is not evenly distributed across risk categories. Further validation using larger, geographically diverse datasets is required before operational deployment.
-
----
-
-# 🌧️ 7-Day Forecasting
-
-LandGuard AI is designed to move beyond single-time-point risk assessment toward continuous predictive monitoring.
-
-The forecasting pipeline can use:
-
-```text
-Weather Forecast
-      +
-Soil Moisture
-      +
-Terrain
-      +
-Vegetation
-      +
-Historical Landslide Data
-      ↓
-AI Risk Assessment
-      ↓
-7-Day Risk Forecast
-```
-
-The current prototype demonstrates this workflow using forecast rainfall inputs.
-
----
-
-# 🌐 Live Deployment
-
-### 🚀 Frontend
-
+**Frontend:**  
 https://landguardai-dun.vercel.app/
 
-### ⚡ Backend API
+**Backend:**  
+https://landguardai-uah8.onrender.com/
 
-https://landguardai-uah8.onrender.com
+---
 
-### 📚 API Documentation
+# 🌍 Intended Use
+
+LandGuard AI 2.0 is designed as a **disaster-management decision-support prototype** for applications such as:
+
+- District disaster management
+- Heavy-rainfall monitoring
+- Inundation-risk screening
+- Emergency planning
+- Infrastructure monitoring
+- Community warning systems
+- GIS-based disaster intelligence
+- Post-event satellite assessment
+
+The platform can be extended for use by:
+
+- District administrations
+- Disaster Management Authorities
+- Emergency response teams
+- Infrastructure departments
+- Researchers
+- Local communities
+
+---
+
+# 🔮 Future Enhancements
+
+The current system provides a foundation for a more comprehensive disaster-intelligence platform.
+
+Planned enhancements include:
+
+### 📡 Radar Integration
+
+Integration of high-frequency weather-radar observations for improved short-term rainfall monitoring.
+
+### ⏱️ 6–24 Hour Nowcasting
+
+High-frequency observational and radar data can be incorporated to support:
 
 ```text
-https://landguardai-uah8.onrender.com/docs
+6-hour
+12-hour
+24-hour
 ```
 
-### 💻 GitHub Repository
+short-horizon predictions.
 
-https://github.com/tlab-580/LandGuardAI
+### 🌊 Improved Inundation Mapping
 
----
+Future versions can incorporate:
 
-# 🎯 Impact
+- DEM-based hydrological modelling
+- Drainage networks
+- River/water-level observations
+- Historical flood masks
+- Higher-resolution satellite imagery
 
-LandGuard AI is designed to support multiple stakeholders.
+### 🧠 Advanced ML Models
 
-### 🏛️ Disaster Management Authorities
+The prediction pipeline can be expanded using:
 
-* Location-aware risk information
-* Preparedness support
-* Resource prioritization
+- Gradient boosting
+- Random Forest
+- XGBoost
+- Temporal models
+- LSTM/GRU
+- Spatiotemporal deep learning
+- Ensemble forecasting
 
-### 🚑 Emergency Response Teams
+### 🎯 Impact-Based Warning
 
-* Identify potentially vulnerable areas
-* Support inspection and response planning
-* Improve situational awareness
-
-### 👨‍👩‍👧‍👦 Communities
-
-* Earlier awareness of changing risk conditions
-* Disaster preparedness information
-* Risk communication
-
-### 🛣️ Infrastructure Stakeholders
-
-* Visibility into potentially vulnerable roads and infrastructure
-* Support for preventive planning
-
----
-
-# 💡 Innovation
-
-LandGuard AI combines multiple environmental factors instead of relying only on a single rainfall threshold.
-
-### Key innovation areas:
-
-* Multi-factor AI risk assessment
-* Interactive GIS visualization
-* Machine-learning-based classification
-* 7-day forecasting framework
-* Disaster intelligence dashboard
-* Scalable API-based architecture
-
----
-
-# 🔮 Future Scope
-
-The project can be expanded through:
-
-* 🌦️ Real-time weather API integration
-* 🛰️ Satellite imagery integration
-* 🌍 Advanced GIS and terrain datasets
-* 💧 IoT soil-moisture sensors
-* 📡 Continuous real-time monitoring
-* 🔮 Improved 7-day predictive forecasting
-* 📱 SMS and mobile application alerts
-* 📧 Email notifications
-* 🚨 Automated emergency-response workflows
-* 🧠 Advanced deep-learning models
-* 📚 Larger historical landslide datasets
-* 🗺️ Expansion to additional landslide-prone regions
-
----
-
-# ⚠️ Limitations
-
-This repository represents a prototype and research-oriented implementation.
-
-Current limitations include:
-
-* Prototype dataset size and geographic coverage
-* Dependence on the quality of input environmental data
-* Forecasting currently uses simulated/demo rainfall inputs
-* No direct IoT sensor integration yet
-* No operational emergency-alert infrastructure
-* Model performance requires validation on larger real-world datasets
-
-**LandGuard AI should not be treated as a replacement for official disaster warnings or professional geological assessment.**
-
----
-
-# 🧪 Future Development Pipeline
+Future versions can generate warnings based on:
 
 ```text
-Current Prototype
-       │
-       ▼
-Real-Time Weather APIs
-       │
-       ▼
-Satellite & GIS Data
-       │
-       ▼
-IoT Environmental Sensors
-       │
-       ▼
-Continuous Data Pipeline
-       │
-       ▼
-Advanced ML / Deep Learning
-       │
-       ▼
-Localized 7-Day Forecasting
-       │
-       ▼
-Automated Alerts
-       │
-       ▼
-Disaster Response Integration
+Hazard
+   +
+Population Exposure
+   +
+Infrastructure Exposure
+   +
+Accessibility
+   +
+Critical Facilities
 ```
+
+to prioritize response actions.
+
+---
+
+# ⚠️ Current Limitations
+
+LandGuard AI 2.0 is currently a **prototype research/hackathon system**.
+
+Important limitations:
+
+1. The integrated hazard index is an evidence-fusion score and is not a calibrated flood probability.
+
+2. Sentinel-1 processing currently identifies potential inundation candidates rather than producing a fully validated flood map.
+
+3. The 7-day AI forecast currently uses meteorological rainfall forecast inputs while current soil-moisture context is used for the prediction scenario.
+
+4. High-frequency radar/observational data integration for operational 6–24 hour nowcasting is not yet implemented.
+
+5. The model and integrated scoring system require validation using historical events, field observations, and larger geographically diverse datasets before operational deployment.
+
+---
+
+# 🎯 Vision
+
+The long-term goal of LandGuard AI is to create an integrated disaster-intelligence platform that transforms raw environmental data into actionable information.
+
+```text
+Raw Data
+   ↓
+Intelligence
+   ↓
+Risk
+   ↓
+Impact
+   ↓
+Priority
+   ↓
+Action
+```
+
+**LandGuard AI 2.0 aims to move disaster management from reactive response toward data-driven, predictive decision support.**
 
 ---
 
 # 👩‍💻 Project
 
-**LandGuard AI**
+**LandGuard AI 2.0**
 
-Developed as an AI/ML and disaster-intelligence project focused on improving landslide risk assessment and preparedness.
+AI-Powered Heavy Rainfall, Inundation Forecasting & Disaster Intelligence System
 
-### Repository
+### Project Theme
 
-https://github.com/tlab-580/LandGuardAI
-
-### Live Demo
-
-https://landguardai-dun.vercel.app/
+**Disaster Management + Artificial Intelligence + Remote Sensing + GIS + Weather Intelligence**
 
 ---
 
-# 📜 References
+# 📜 License
 
-* Geological Survey of India — Landslide Hazard and Landslide Early Warning research
-* ISRO — Landslide Atlas of India
-* OpenStreetMap
-* Scikit-learn documentation
-* FastAPI documentation
-* React documentation
-* Leaflet documentation
+This project is intended for educational, research, prototype, and hackathon purposes.
+
+A production deployment should undergo appropriate validation, calibration, reliability testing, data-quality assessment, and disaster-management authority review before being used for real-world emergency decisions.
 
 ---
 
-## ⭐ If you find this project useful
+# ⭐ Acknowledgement
 
-Consider giving the repository a ⭐ and following the project for future updates.
+Built as an AI/ML and geospatial disaster-management prototype integrating:
 
----
-
-### LANDGUARD AI
-
-**AI-driven risk assessment • GIS visualization • Disaster intelligence • Early-warning support**
+**Artificial Intelligence • Machine Learning • Numerical Weather Prediction • Remote Sensing • SAR • GIS • Disaster Intelligence**
