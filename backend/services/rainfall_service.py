@@ -1,4 +1,3 @@
-import os
 import json
 import threading
 import time
@@ -13,23 +12,15 @@ from urllib.error import URLError, HTTPError
 # OPEN-METEO / NWP CONFIGURATION
 # ============================================================
 
-# Free endpoints are retained as a local-development fallback.
-FREE_ECMWF_API_URL = "https://api.open-meteo.com/v1/ecmwf"
-FREE_GFS_API_URL = "https://api.open-meteo.com/v1/gfs"
-
-# Customer API provides a dedicated quota and accepts the same
-# request syntax, with the addition of the API key.
-CUSTOMER_ECMWF_API_URL = (
-    "https://customer-api.open-meteo.com/v1/ecmwf"
+ECMWF_API_URL = "https://api.open-meteo.com/v1/ecmwf"
+GFS_API_URL = "https://api.open-meteo.com/v1/gfs"
+MET_NORWAY_API_URL = (
+    "https://api.met.no/weatherapi/locationforecast/2.0/compact"
 )
-CUSTOMER_GFS_API_URL = (
-    "https://customer-api.open-meteo.com/v1/gfs"
+MET_NORWAY_MAX_DAYS = 9
+MET_NORWAY_USER_AGENT = (
+    "LandGuardAI/2.0 (+https://github.com/tlab-580/LandGuardAI)"
 )
-
-OPEN_METEO_API_KEY = os.getenv(
-    "OPEN_METEO_API_KEY",
-    ""
-).strip()
 
 # Cache successful provider responses in memory so repeated
 # dashboard requests do not repeatedly hit the external API.
@@ -140,6 +131,134 @@ def _build_hourly_params(
 
 
 # ============================================================
+# MET NORWAY FALLBACK REQUEST
+# ============================================================
+
+def _fetch_met_norway_forecast(
+    latitude: float,
+    longitude: float
+):
+    """
+    Fetch a global forecast from MET Norway's Locationforecast 2.0
+    service and normalize it into LandGuard's internal hourly format.
+
+    MET Norway requires an identifying User-Agent. The service provides
+    forecasts worldwide for up to nine days and requires no paid API key.
+    """
+
+    params = {
+        "lat": round(float(latitude), 4),
+        "lon": round(float(longitude), 4),
+    }
+
+    url = (
+        MET_NORWAY_API_URL
+        + "?"
+        + urlencode(params)
+    )
+
+    request = Request(
+        url,
+        headers={
+            "User-Agent": MET_NORWAY_USER_AGENT,
+            "Accept": "application/json",
+        }
+    )
+
+    try:
+        with urlopen(request, timeout=20) as response:
+            raw_data = json.loads(
+                response.read().decode("utf-8")
+            )
+    except HTTPError as error:
+        raise RuntimeError(
+            f"MET Norway API returned HTTP {error.code}"
+        )
+    except URLError as error:
+        raise RuntimeError(
+            "Unable to connect to MET Norway API: "
+            f"{error.reason}"
+        )
+    except (TimeoutError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            "MET Norway API returned an invalid or "
+            f"timed-out response: {error}"
+        )
+
+    properties = raw_data.get("properties", {})
+    timeseries = properties.get("timeseries", [])
+
+    if not timeseries:
+        raise RuntimeError(
+            "MET Norway returned no forecast timeseries data."
+        )
+
+    hourly = {
+        "time": [],
+        "temperature_2m": [],
+        "relative_humidity_2m": [],
+        "precipitation": [],
+        "rain": [],
+        "weather_code": [],
+        "wind_speed_10m": [],
+        "soil_moisture_0_to_10cm": [],
+    }
+
+    for item in timeseries:
+        timestamp = item.get("time")
+        data = item.get("data", {})
+        instant_details = (
+            data.get("instant", {}).get("details", {})
+        )
+
+        precipitation_data = (
+            data.get("next_1_hours", {}).get("details", {})
+        )
+
+        if not precipitation_data:
+            precipitation_data = (
+                data.get("next_6_hours", {}).get("details", {})
+            )
+
+        precipitation_amount = precipitation_data.get(
+            "precipitation_amount"
+        )
+
+        hourly["time"].append(timestamp)
+        hourly["temperature_2m"].append(
+            instant_details.get("air_temperature")
+        )
+        hourly["relative_humidity_2m"].append(
+            instant_details.get("relative_humidity")
+        )
+        hourly["precipitation"].append(
+            precipitation_amount
+        )
+        hourly["rain"].append(
+            precipitation_amount
+        )
+        hourly["weather_code"].append(
+            None
+        )
+        hourly["wind_speed_10m"].append(
+            instant_details.get("wind_speed")
+        )
+        hourly["soil_moisture_0_to_10cm"].append(
+            None
+        )
+
+    normalized = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "timezone": "UTC",
+        "hourly": hourly,
+        "source_format": "MET Norway Locationforecast 2.0",
+    }
+
+    return normalized, url
+
+
+# ============================================================
 # NWP REQUEST
 # ============================================================
 
@@ -155,15 +274,6 @@ def _request_model(
         longitude,
         days
     )
-
-    if base_url.startswith("https://customer-api.open-meteo.com"):
-        if not OPEN_METEO_API_KEY:
-            raise RuntimeError(
-                "OPEN_METEO_API_KEY is not configured for the "
-                "Open-Meteo customer API."
-            )
-
-        params["apikey"] = OPEN_METEO_API_KEY
 
     url = (
         base_url
@@ -277,9 +387,14 @@ def _get_weather_data(
     Provider order:
 
     1. Recent successful cache
-    2. ECMWF IFS
+    2. ECMWF IFS through Open-Meteo
     3. NOAA GFS through Open-Meteo
-    4. Stale successful cache
+    4. MET Norway Locationforecast
+    5. Stale successful cache
+
+    MET Norway is used as a free no-key fallback when Open-Meteo is
+    rate-limited or temporarily unavailable. It supplies up to nine
+    days of global forecast data.
 
     The result records which NWP model actually supplied the data.
     """
@@ -295,31 +410,16 @@ def _get_weather_data(
 
     errors = []
 
-    if OPEN_METEO_API_KEY:
-        providers = [
-            (
-                CUSTOMER_ECMWF_API_URL,
-                "ECMWF IFS"
-            ),
-            (
-                CUSTOMER_GFS_API_URL,
-                "NOAA GFS"
-            ),
-        ]
-    else:
-        # Local development can still use the free endpoints.
-        # Render/production should set OPEN_METEO_API_KEY so the
-        # customer endpoint with dedicated capacity is used.
-        providers = [
-            (
-                FREE_ECMWF_API_URL,
-                "ECMWF IFS"
-            ),
-            (
-                FREE_GFS_API_URL,
-                "NOAA GFS"
-            ),
-        ]
+    providers = [
+        (
+            ECMWF_API_URL,
+            "ECMWF IFS"
+        ),
+        (
+            GFS_API_URL,
+            "NOAA GFS"
+        ),
+    ]
 
     for base_url, model_name in providers:
 
@@ -345,6 +445,34 @@ def _get_weather_data(
             errors.append(
                 f"{model_name}: {error}"
             )
+
+    # Final free/no-key fallback. MET Norway provides a global
+    # Locationforecast with up to nine days of forecast data.
+    try:
+        met_data, met_url = _fetch_met_norway_forecast(
+            latitude=latitude,
+            longitude=longitude
+        )
+
+        _store_cached_weather(
+            latitude=latitude,
+            longitude=longitude,
+            data=met_data,
+            model="MET Norway Locationforecast",
+            source_url=met_url
+        )
+
+        cached_result = _get_stale_cached_weather(
+            latitude,
+            longitude
+        )
+
+        return cached_result, False
+
+    except RuntimeError as error:
+        errors.append(
+            f"MET Norway Locationforecast: {error}"
+        )
 
     stale = _get_stale_cached_weather(
         latitude,
@@ -645,6 +773,13 @@ def generate_meteorological_forecast(
         "forecast": [],
     }
 
+    if model == "MET Norway Locationforecast":
+        result["fallback_note"] = (
+            "MET Norway free global fallback used because the "
+            "Open-Meteo NWP providers were unavailable. "
+            "This provider supports up to nine forecast days."
+        )
+
     for item in forecast:
         result["forecast"].append({
             **item,
@@ -661,12 +796,6 @@ def generate_meteorological_forecast(
     else:
         result["live"] = True
         result["cache_status"] = "fresh_or_recent_cached_data"
-
-    result["api_access"] = (
-        "Open-Meteo customer API"
-        if OPEN_METEO_API_KEY
-        else "Open-Meteo free API"
-    )
 
     return result
 
@@ -782,6 +911,12 @@ def generate_current_weather(
         "data_type": "Current meteorological data"
     }
 
+    if model == "MET Norway Locationforecast":
+        result["fallback_note"] = (
+            "MET Norway free global fallback used because the "
+            "Open-Meteo NWP providers were unavailable."
+        )
+
     if used_stale_cache:
         result["live"] = False
         result["cache_status"] = (
@@ -790,11 +925,5 @@ def generate_current_weather(
     else:
         result["live"] = True
         result["cache_status"] = "fresh_or_recent_cached_data"
-
-    result["api_access"] = (
-        "Open-Meteo customer API"
-        if OPEN_METEO_API_KEY
-        else "Open-Meteo free API"
-    )
 
     return result

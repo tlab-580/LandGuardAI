@@ -145,15 +145,7 @@ def health():
         "version":
             "2.0.0"
     }
-@app.get("/weather-config-status")
-def weather_config_status():
-    import os
 
-    return {
-        "open_meteo_customer_key_configured": bool(
-            os.getenv("OPEN_METEO_API_KEY")
-        )
-    }
 
 # ============================================================
 # SENTINEL-1 AGGREGATED SATELLITE OBSERVATION
@@ -375,21 +367,24 @@ def meteorological_forecast(
             days=days
         )
 
-        return {
+        response = {
 
             "status":
                 "success",
 
             "source":
-                "ECMWF IFS",
+                result.get("model"),
 
             "provider":
-                "Open-Meteo",
+                result.get("provider"),
 
             "forecast_type":
                 "Numerical Weather Prediction",
 
             "forecast_days":
+                result.get("forecast_days", len(result["forecast"])),
+
+            "requested_days":
                 days,
 
             "location":
@@ -398,6 +393,17 @@ def meteorological_forecast(
             "forecast":
                 result["forecast"]
         }
+
+        if "live" in result:
+            response["live"] = result["live"]
+
+        if "cache_status" in result:
+            response["cache_status"] = result["cache_status"]
+
+        if "fallback_note" in result:
+            response["fallback_note"] = result["fallback_note"]
+
+        return response
 
     except Exception as error:
 
