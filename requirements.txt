@@ -3,4 +3,4 @@ uvicorn[standard]
 pandas
 scikit-learn
 joblib
-python-multipart
+python-multipartPillow>=12.0.0
