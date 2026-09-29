@@ -499,33 +499,246 @@ function App() {
         const latitude = 26.1445;
         const longitude = 91.7362;
 
-
-        const response =
-          await fetch(
-            `${import.meta.env.VITE_API_URL}/current-weather?latitude=${latitude}&longitude=${longitude}`
-          );
+        const apiUrl =
+          import.meta.env.VITE_API_URL;
 
 
-        if (!response.ok) {
+        if (!apiUrl) {
 
           throw new Error(
-            "Failed to fetch current weather"
+            "VITE_API_URL is not configured."
           );
 
         }
 
 
-        const data =
-          await response.json();
+        // =====================================================
+        // 1. TRY LANDGUARD BACKEND FIRST
+        // =====================================================
+
+        const backendUrl =
+          `${apiUrl}/current-weather` +
+          `?latitude=${latitude}` +
+          `&longitude=${longitude}`;
 
 
         console.log(
-          "Current meteorological data:",
-          data
+          "Fetching current weather from LandGuard backend:",
+          backendUrl
         );
 
 
-        setCurrentWeather(data);
+        try {
+
+          const backendResponse =
+            await fetch(backendUrl);
+
+
+          console.log(
+            "Current weather backend response status:",
+            backendResponse.status
+          );
+
+
+          if (backendResponse.ok) {
+
+            const backendData =
+              await backendResponse.json();
+
+
+            console.log(
+              "Current meteorological data from backend:",
+              backendData
+            );
+
+
+            if (
+              backendData.status === "success" &&
+              backendData.temperature != null
+            ) {
+
+              setCurrentWeather(
+                backendData
+              );
+
+              return;
+
+            }
+
+          }
+
+        } catch (backendError) {
+
+          console.warn(
+            "LandGuard current-weather backend unavailable:",
+            backendError
+          );
+
+        }
+
+
+        // =====================================================
+        // 2. DIRECT FREE OPEN-METEO ECMWF FALLBACK
+        // =====================================================
+
+        const directParams =
+          new URLSearchParams({
+
+            latitude:
+              String(latitude),
+
+            longitude:
+              String(longitude),
+
+            current:
+              "temperature_2m," +
+              "relative_humidity_2m," +
+              "precipitation," +
+              "rain," +
+              "weather_code," +
+              "wind_speed_10m," +
+              "soil_moisture_0_to_7cm",
+
+            timezone:
+              "auto"
+
+          });
+
+
+        const directUrl =
+          "https://api.open-meteo.com/v1/ecmwf?" +
+          directParams.toString();
+
+
+        console.log(
+          "Fetching direct ECMWF current weather:",
+          directUrl
+        );
+
+
+        const directResponse =
+          await fetch(directUrl);
+
+
+        console.log(
+          "Direct ECMWF current-weather response status:",
+          directResponse.status
+        );
+
+
+        if (!directResponse.ok) {
+
+          const errorText =
+            await directResponse.text();
+
+          throw new Error(
+            `Direct ECMWF current-weather API error ` +
+            `${directResponse.status}: ${errorText}`
+          );
+
+        }
+
+
+        const directData =
+          await directResponse.json();
+
+
+        console.log(
+          "Direct ECMWF current-weather response:",
+          directData
+        );
+
+
+        const current =
+          directData.current;
+
+
+        if (
+          !current ||
+          current.temperature_2m == null
+        ) {
+
+          throw new Error(
+            "Direct ECMWF response contains no current weather data."
+          );
+
+        }
+
+
+        const currentWeatherData = {
+
+          status:
+            "success",
+
+          location: {
+
+            latitude:
+              latitude,
+
+            longitude:
+              longitude
+
+          },
+
+          time:
+            current.time ??
+            null,
+
+          temperature:
+            current.temperature_2m ??
+            null,
+
+          relative_humidity:
+            current.relative_humidity_2m ??
+            null,
+
+          precipitation:
+            current.precipitation ??
+            null,
+
+          rainfall:
+            current.rain ??
+            null,
+
+          weather_code:
+            current.weather_code ??
+            null,
+
+          wind_speed:
+            current.wind_speed_10m ??
+            null,
+
+          soil_moisture:
+            current.soil_moisture_0_to_7cm ??
+            null,
+
+          provider:
+            "Open-Meteo",
+
+          model:
+            "ECMWF IFS",
+
+          data_type:
+            "Current meteorological data",
+
+          live:
+            true,
+
+          cache_status:
+            "direct_open_meteo_fallback"
+
+        };
+
+
+        setCurrentWeather(
+          currentWeatherData
+        );
+
+
+        console.log(
+          "Direct ECMWF current weather used:",
+          currentWeatherData
+        );
 
 
       } catch (error) {
@@ -1512,7 +1725,7 @@ function App() {
 
 
             <div className="meteorological-source-badge">
-              🌍{meteorologicalSource} • NWP
+              🌍 {meteorologicalSource} • NWP
             </div>
 
           </div>
@@ -1648,7 +1861,7 @@ function App() {
 
 
                         <div className="meteo-source">
-                         {meteorologicalSource} • NWP
+                          {meteorologicalSource} • NWP
                         </div>
 
                       </div>
